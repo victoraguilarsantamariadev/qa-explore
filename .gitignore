@@ -1,3 +1,6 @@
+# local working notes (not part of the published plugin)
+HANDOFF.md
+
 # qa-explore runtime artifacts
 /tmp/
 *.har
