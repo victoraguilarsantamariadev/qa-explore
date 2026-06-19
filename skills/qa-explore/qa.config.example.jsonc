@@ -1,0 +1,35 @@
+{
+  // ---- qa-explore project config. Copy to <project>/qa.config.json and fill in. ----
+
+  // Where the app lives.
+  "baseUrl": "http://localhost:3000",
+  "appPath": "/",                           // path the SPA is served under ("/" if at root)
+
+  // Plain-prose login recipe the agents follow (be exact: selectors, the response to wait for,
+  // where the token goes). Point at a project login helper if one exists. Leave "" if the app is open.
+  "login": "Username 'user', password '...'. Fill #user / #pass, click [type=submit], wait for /api/login 200.",
+
+  // Where to put screenshots, evidence (trace/HAR/video/console) and the generated report.
+  // The shared login session is cached here as storageState.json and reused by every agent.
+  "shotsDir": "/tmp/qa-explore",
+
+  // Directory that has @playwright/test + chromium installed AND is where Codify writes specs.
+  "e2eDir": "./e2e",
+  "framework": "playwright",                // "playwright" | "cypress"
+
+  // Cap how many areas to cover (cost control / PR-scoped runs).
+  "maxAreas": 10,
+
+  // Where the router/routes are defined, so recon can enumerate routes from source.
+  "sourceHints": "./src (grep for route path definitions)",
+
+  // THE biggest lever against false positives: known-correct / intentional behaviour.
+  // Anything listed here must NOT be reported as a bug. THIS GROWS AUTOMATICALLY:
+  // every time you reject a finding at triage, the skill appends the reason here so it
+  // is never re-flagged. Keep this file in the repo so the whole team's learning is shared.
+  "domainNotes": "- (example) live/websocket widgets show an empty preview by design.\n- (example) ids may be numeric, not UUID.\n- (example) clipboard APIs are unavailable over plain HTTP in headless browsers.",
+
+  // Pre-defined areas. OMIT (null) to let recon auto-discover them; the skill caches the
+  // discovered list back here so later runs skip recon. Each area = { key, label, mission }.
+  "areas": null
+}

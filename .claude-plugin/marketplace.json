@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "qa-explore",
+  "description": "Agent-based exploratory E2E QA for any web app — explore, verify, learn, and codify a self-growing test suite.",
+  "owner": {
+    "name": "Víctor"
+  },
+  "plugins": [
+    {
+      "name": "qa-explore",
+      "description": "A team of AI agents that test any web app like human QA: explore the live app, visually judge rendering + data, capture trace/HAR/console/video evidence, adversarially verify findings, learn from rejected ones, and codify confirmed bugs + working flows into a self-growing Playwright/Cypress suite.",
+      "author": { "name": "Víctor" },
+      "category": "testing",
+      "source": {
+        "source": "github",
+        "repo": "REPLACE_WITH_YOUR_GH_USER/qa-explore"
+      },
+      "homepage": "https://github.com/REPLACE_WITH_YOUR_GH_USER/qa-explore"
+    }
+  ]
+}

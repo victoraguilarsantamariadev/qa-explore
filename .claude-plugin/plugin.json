@@ -1,0 +1,10 @@
+{
+  "name": "qa-explore",
+  "version": "0.1.0",
+  "description": "A team of AI agents that test any web app like human QA: they explore the live app, screenshot and visually judge rendering + data, capture trace/HAR/console/video evidence, adversarially verify findings, learn from rejected ones, and codify confirmed bugs and working flows into a self-growing Playwright/Cypress suite.",
+  "author": {
+    "name": "Víctor"
+  },
+  "keywords": ["testing", "e2e", "qa", "playwright", "agents", "exploratory-testing", "regression"],
+  "license": "MIT"
+}

@@ -1,0 +1,9 @@
+# qa-explore runtime artifacts
+/tmp/
+*.har
+*.zip
+storageState.json
+node_modules/
+.DS_Store
+
+# screenshots / reports are written to shotsDir (default /tmp/qa-explore), not the repo
