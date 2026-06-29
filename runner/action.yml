@@ -1,0 +1,61 @@
+name: qa-explore
+description: Exploratory E2E QA agents that drive a real browser, judge rendering + data, and report findings — headless, on every PR.
+author: qa-explore
+
+inputs:
+  skill:
+    description: Which engine to run — explore | report | codify | fix | heal.
+    default: explore
+  base-url:
+    description: The deployed app URL to test (overrides baseUrl in the config).
+    required: true
+  config:
+    description: Path to qa.config.json.
+    default: qa.config.json
+  mode:
+    description: explore | no-delete | read-only. Defaults to read-only — the SAFE choice for CI; never writes to the target.
+    default: read-only
+  claude-token:
+    description: CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`, uses your subscription) OR an ANTHROPIC_API_KEY. Store as a secret.
+    required: true
+  node-version:
+    description: Node version.
+    default: "20"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install runner + Chromium
+      shell: bash
+      run: |
+        cd "${{ github.action_path }}"
+        npm ci --omit=dev || npm install --omit=dev
+        npx --yes playwright install --with-deps chromium
+
+    - name: Run qa-explore (${{ inputs.skill }}, mode=${{ inputs.mode }})
+      shell: bash
+      env:
+        # The SDK picks up whichever of these is set. CLAUDE_CODE_OAUTH_TOKEN uses your subscription.
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-token }}
+        ANTHROPIC_API_KEY: ${{ inputs.claude-token }}
+      run: |
+        node "${{ github.action_path }}/bin/qa-explore.mjs" "${{ inputs.skill }}" \
+          --config "${{ inputs.config }}" \
+          --base "${{ inputs.base-url }}" \
+          --mode "${{ inputs.mode }}" \
+          > qa-explore-result.json || true
+        echo "result written to qa-explore-result.json"
+
+    - name: Upload findings + evidence
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: qa-explore-${{ inputs.skill }}
+        path: |
+          qa-explore-result.json
+          /tmp/qa-explore/**
+        if-no-files-found: ignore

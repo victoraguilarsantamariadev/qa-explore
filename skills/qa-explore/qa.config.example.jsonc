@@ -5,9 +5,52 @@
   "baseUrl": "http://localhost:3000",
   "appPath": "/",                           // path the SPA is served under ("/" if at root)
 
+  // ⚠️ WHAT THE RUN IS ALLOWED TO DO TO THE TARGET. This controls BEHAVIOUR, not the environment —
+  // it works the same wherever baseUrl points. Writing against real production is YOUR call (your infra,
+  // your data, your risk); these are the dials, from most to least powerful:
+  //  "explore"   (default) = behave like a REAL user: navigate AND create / edit / submit / DELETE.
+  //               Everything created is prefixed "qa-<area>-<ts>" and best-effort cleaned up (NOT guaranteed).
+  //  "no-delete" = write (create / edit / submit) but NEVER delete. The safe middle ground for a
+  //               sensitive / production target: you exercise write flows without risking destructive removals.
+  //  "read-only" = navigate, screenshot and judge ONLY; zero writes. The cautious choice for real production.
+  // Whatever you pick: the agents never touch data that looks real / pre-existing, and a dedicated QA
+  // account whose data is segregated is strongly recommended for any write run against production.
+  "mode": "explore",                        // "explore" (full) | "no-delete" (write, no delete) | "read-only"
+
+  // NETWORK CONFINEMENT. The agents may ONLY touch these hosts; any link/redirect/request that would
+  // leave them must be refused (they never probe or scan other machines on your network). Omit to
+  // auto-derive from baseUrl. Add the tracker host automatically — you don't need to list it here.
+  "allowedHosts": null,                     // e.g. ["192.168.1.164"]; null = just the baseUrl host
+
+  // What kind of target this is — picks the agent's "hands". "web-spa"/"web-ssr" drive Chromium
+  // (deeply supported). "electron" drives the desktop app via Playwright Electron. "api"/"cli" swap
+  // the browser for HTTP/CLI calls (same explore→verify→report loop, different tool).
+  "projectType": "web-spa",                 // "web-spa" | "web-ssr" | "electron" | "api" | "cli"
+
   // Plain-prose login recipe the agents follow (be exact: selectors, the response to wait for,
   // where the token goes). Point at a project login helper if one exists. Leave "" if the app is open.
   "login": "Username 'user', password '...'. Fill #user / #pass, click [type=submit], wait for /api/login 200.",
+
+  // Viewports the explore pass sweeps. The FIRST is primary (full pass); each EXTRA re-walks the key
+  // screens at that size and runs a MOBILE/RESPONSIVE checklist (no horizontal scroll, hamburger menu
+  // opens, ~44px tap targets, sticky bars don't cover inputs, viewport meta present, on-screen keyboard
+  // doesn't hide fields, images/tables scale, tap reveals hover-only menus). Use a Playwright device
+  // name OR an explicit size; set "browser":"webkit" for true iOS/Safari fidelity (a Chromium browser
+  // with an iPhone UA is NOT real Safari). Just desktop by default; uncomment mobile to test it too.
+  "viewports": [
+    { "name": "desktop", "width": 1440, "height": 900 }
+    // , { "name": "mobile-ios", "playwrightDevice": "iPhone 13", "browser": "webkit" }
+    // , { "name": "mobile-android", "playwrightDevice": "Pixel 7" }
+    // , { "name": "tablet", "width": 820, "height": 1180, "isMobile": true }
+  ],
+
+  // Roles to cover. The FIRST is the PRIMARY role and drives the normal exploration. Each EXTRA role
+  // adds an ACCESS-CONTROL check: log in as it and confirm it CANNOT see/do things above its privilege
+  // (broken-access-control = high-value security findings). Omit/[] → single implicit role from `login`.
+  "roles": [
+    // { "name": "admin",  "login": "Fill #user 'admin' / #pass 'admin'; wait /api/login 200." },
+    // { "name": "viewer", "login": "Fill #user 'viewer' / #pass '...'; wait /api/login 200." }
+  ],
 
   // Where to put screenshots, evidence (trace/HAR/video/console) and the generated report.
   // The shared login session is cached here as storageState.json and reused by every agent.
@@ -17,10 +60,26 @@
   "e2eDir": "./e2e",
   "framework": "playwright",                // "playwright" | "cypress"
 
-  // Cap how many areas to cover (cost control / PR-scoped runs).
+  // Cap how many areas to cover (cost control / PR-scoped runs). Used in "sample" coverage.
   "maxAreas": 10,
 
+  // COVERAGE STRATEGY — how much of the app to test.
+  //  "sample" (default): one agent per functional area (≤ maxAreas). Broad, cheap, representative —
+  //           a thorough human-style pass, but it does NOT guarantee every route/widget/variant.
+  //  "exhaustive": recon builds a COMPLETE INVENTORY (every route, entity, and enumerable variant —
+  //           e.g. EVERY widget type) and fans out ONE unit of work per item (a separate "create a
+  //           <X> widget" per widget type, full CRUD per entity, a visit per route). Then a
+  //           completeness-critic loops over the inventory and covers any GAP until none remain
+  //           (or maxRounds / maxUnits is hit — drops are LOGGED, never silent). This is "test
+  //           absolutely everything that exists" — more tokens, controlled by scope not by capping.
+  "coverage": {
+    "mode": "sample",                         // "sample" | "exhaustive"
+    "maxRounds": 3,                           // completeness-critic rounds (loop-until-no-gaps)
+    "maxUnits": 200                           // hard upper bound on units of work (safety; over it → logged drop)
+  },
+
   // Where the router/routes are defined, so recon can enumerate routes from source.
+  // For "exhaustive", point this at routes + the widget/component registry + API so nothing is missed.
   "sourceHints": "./src (grep for route path definitions)",
 
   // THE biggest lever against false positives: known-correct / intentional behaviour.
@@ -31,5 +90,71 @@
 
   // Pre-defined areas. OMIT (null) to let recon auto-discover them; the skill caches the
   // discovered list back here so later runs skip recon. Each area = { key, label, mission }.
-  "areas": null
+  "areas": null,
+
+  // ---- Issue tracker: the closed loop (file issue -> human marks it real -> qa-fix opens a MR) ----
+  // qa-explore files an issue per verify-confirmed finding. A HUMAN then adds `fixLabel` to the ones
+  // that are genuinely bugs (the triage gate lives in the tracker now). `/qa-fix` later picks up only
+  // the labelled issues, fixes them in an isolated worktree, and opens a MR/PR for you to merge.
+  // Set "type":"none" to disable: qa-explore then just reports findings in chat (no issues filed).
+  "tracker": {
+    "type": "none",                            // "gitlab" | "github" | "none"
+    "host": "https://gitlab.example.com",      // self-hosted GitLab base URL incl. port (omit for gitlab.com / github.com)
+    "project": "group/subgroup/repo",          // project path (or numeric id) where issues + MRs live
+    "tokenEnv": "GITLAB_TOKEN",                // env var holding a PAT with `api` scope — NEVER inline the token here
+
+    "issueLabels": ["qa-explore"],             // labels stamped on every auto-filed issue (used for dedup too)
+    "fixLabel": "qa::confirmed",               // the label a HUMAN adds to greenlight auto-fixing — this is the gate
+    "fixingLabel": "qa::fixing",               // qa-fix stamps this while working, so an issue is not picked up twice
+    "defaultBranch": "develop",                // target branch for the merge requests qa-fix opens
+    "assignees": [],                           // optional usernames to assign filed issues / opened MRs to
+
+    // Which findings get an issue. Default: real problems only (not every cosmetic nitpick).
+    // Any finding with confidence "hard-evidence" is always filed regardless of severity.
+    "fileSeverities": ["blocker", "major", "data-sense"],
+
+    // Evidence UPLOADED into each issue so remote reviewers can see/repro without local files.
+    // "screenshot" = inline image (cheap, always worth it); "video" = the recorded repro;
+    // "trace" = the Playwright trace.zip (best for the fixer). Files over maxAttachMb are skipped
+    // (referenced by path instead — qa-fix can still open them locally).
+    "attachEvidence": ["screenshot", "video"],
+    "maxAttachMb": 10
+  },
+
+  // ---- /qa-fix: how the fixing half runs (only used by the qa-fix skill) ----
+  "fix": {
+    // One MR per bug (default, atomic + independently reviewable) or one MR per run ("batched",
+    // for piles of small related fixes). Volume is controlled by the fixLabel gate + maxFixes, not by bundling.
+    "fixStrategy": "per-issue",               // "per-issue" | "batched"
+    "maxFixes": 5,                            // cap how many labelled issues qa-fix attempts per run
+
+    // ⚠️ The regression test + the bug repro MUST run against the CHANGED code in the worktree, NOT
+    // against baseUrl (which serves the OLD deployed code until you redeploy). Two ways to ensure that:
+    //  - buildTest: a code-level check (unit/integration) that COMPILES the changed code and sees the fix
+    //    directly. Preferred — most reliable. (e.g. "./mvnw -q test -pl adapter" or "npm test").
+    "buildTest": "",                          // e.g. "./mvnw -q test -pl adapter"
+    //  - localRun: OPTIONAL — when only a browser/E2E test can express the bug, build + serve the FIXED
+    //    app locally from the worktree and point the test/repro at THIS url (never at baseUrl). Omit if
+    //    your regression tests are code-level and need no running app.
+    "localRun": {
+      "command": "",                          // e.g. "./mvnw -q -pl bootstrap spring-boot:run" | "npm run build && npm run preview"
+      "url": ""                               // where it serves once up, e.g. "http://localhost:8080"
+    },
+
+    // Independent skeptic that re-verifies EACH fix before you review the MR: audits the regression test
+    // (correct behaviour, not a tautology), confirms it is red WITHOUT the fix and green WITH it, reproduces
+    // that the original bug is gone, reviews the diff for side-effects, and comments its verdict on the MR.
+    "verify": true                            // set false to skip the adversarial fix check
+  },
+
+  // ---- /qa-heal: self-healing suite (only used by the qa-heal skill) ----
+  // When the deterministic suite goes red, qa-heal repairs STALE tests (selectors/waits) and flags REAL
+  // regressions as bugs. Cardinal rule it enforces: heal the HOW, never the WHAT (assertions) — a green
+  // forced by weakening an assertion would hide a real bug.
+  "heal": {
+    "verify": true,                           // independent pass that confirms the repair diff touched NO assertion
+    "maxHeal": 30,                            // cap failing tests adjudicated per run
+    "suiteCommand": ""                        // how to run the suite to collect failures; "" = framework default
+                                              //   (playwright: "npx playwright test --reporter=json")
+  }
 }

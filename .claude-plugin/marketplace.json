@@ -8,14 +8,14 @@
   "plugins": [
     {
       "name": "qa-explore",
-      "description": "A team of AI agents that test any web app like human QA: explore the live app, visually judge rendering + data, capture trace/HAR/console/video evidence, adversarially verify findings, learn from rejected ones, and codify confirmed bugs + working flows into a self-growing Playwright/Cypress suite.",
+      "description": "A team of AI agents that test any web app like human QA: explore the live app, visually judge rendering + data, capture trace/HAR/console/video evidence, adversarially verify findings, learn from rejected ones, codify them into a self-growing Playwright/Cypress suite — then file GitLab/GitHub issues and (via /qa-fix) open regression-tested merge requests for the confirmed bugs.",
       "author": { "name": "Víctor" },
       "category": "testing",
       "source": {
         "source": "github",
-        "repo": "REPLACE_WITH_YOUR_GH_USER/qa-explore"
+        "repo": "victoraguilarsantamariadev/qa-explore"
       },
-      "homepage": "https://github.com/REPLACE_WITH_YOUR_GH_USER/qa-explore"
+      "homepage": "https://github.com/victoraguilarsantamariadev/qa-explore"
     }
   ]
 }

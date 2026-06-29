@@ -1,7 +1,7 @@
 {
   "name": "qa-explore",
-  "version": "0.1.0",
-  "description": "A team of AI agents that test any web app like human QA: they explore the live app, screenshot and visually judge rendering + data, capture trace/HAR/console/video evidence, adversarially verify findings, learn from rejected ones, and codify confirmed bugs and working flows into a self-growing Playwright/Cypress suite.",
+  "version": "0.2.0",
+  "description": "A team of AI agents that test any web app like human QA: explore the live app, screenshot and visually judge rendering + data, capture trace/HAR/console/video evidence, adversarially verify findings, learn from rejected ones, codify them into a self-growing Playwright/Cypress suite — and close the loop by filing GitLab/GitHub issues and (via /qa-fix) opening regression-tested merge requests for confirmed bugs.",
   "author": {
     "name": "Víctor"
   },
