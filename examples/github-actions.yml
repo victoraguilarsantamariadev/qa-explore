@@ -1,0 +1,28 @@
+# qa-explore on GitHub Actions — copy to <your app repo>/.github/workflows/qa.yml
+# Runs the exploratory QA agents against a deployed preview URL, headless, and uploads
+# the findings JSON + evidence as a build artifact.
+#
+# One-time setup: add a repo secret CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`,
+# uses your Claude subscription) or ANTHROPIC_API_KEY (pay-per-token).
+# Requires a qa.config.json in the repo root (or pass `config:` pointing elsewhere).
+name: qa-explore
+on:
+  workflow_dispatch:
+    inputs:
+      base-url:
+        description: Deployed app URL to QA
+        required: true
+      mode:
+        description: read-only | no-delete | explore
+        default: read-only
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: victoraguilarsantamariadev/qa-explore/runner@v0
+        with:
+          base-url: ${{ inputs.base-url }}
+          mode: ${{ inputs.mode }}
+          # config: test/E2E/qa.config.json   # uncomment if not at repo root
+          claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

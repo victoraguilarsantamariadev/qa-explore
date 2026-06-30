@@ -122,7 +122,7 @@ A full exploration is token-heavy. Keep your best model everywhere and control c
 
 - v0.1 — Claude Code plugin: explore → verify → triage → codify.
 - v0.2 — **the full loop (this):** GitLab/GitHub issue reporter with embedded evidence; `/qa-fix` (labelled issue → isolated-worktree fix → regression test → independent verify → MR); `/qa-heal` (self-healing suite); multi-viewport (mobile/desktop), multi-role + access-control, project-type switch (web / electron / API / CLI); safe modes + host confinement.
-- v0.3 (in progress) — a **standalone runner** (`runner/`, Claude Agent SDK) + **GitHub Action** so it runs in CI / on PRs without an interactive session, on your subscription. Runs the same engine files via a runtime shim; the shim + CLI are validated (`node --test`) and the live agent path by a live smoke (`npm run smoke`, real SDK — text + structured). Next: a live engine run in CI against a deployed preview.
+- v0.3 — a **standalone runner** (`runner/`, Claude Agent SDK) + **GitHub Action** (`runner@v0`) **and a GitLab CI job** so it runs in CI / on PRs without an interactive session, on your subscription. Same engine via a runtime shim; shim + CLI validated (`node --test`), the live agent path by a live smoke (`npm run smoke`, real SDK). Copy-paste CI configs in [`examples/`](examples). Run it against a deployed preview with `CLAUDE_CODE_OAUTH_TOKEN`.
 - Next — **visual regression** (screenshot diffing); **a11y (axe)** and **perf (Lighthouse)** passes; **Jira / Linear** reporters + SARIF; a `qa-explore init` wizard; inline PR-comment findings.
 
 ## License

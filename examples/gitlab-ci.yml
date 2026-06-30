@@ -1,0 +1,32 @@
+# qa-explore on GitLab CI — paste this job into your app repo's .gitlab-ci.yml.
+# Runs the exploratory QA agents against a DEPLOYED preview/staging URL, headless, and
+# uploads the findings JSON + evidence as artifacts.
+#
+# One-time setup: in the project's Settings → CI/CD → Variables, add a MASKED variable
+#   CLAUDE_CODE_OAUTH_TOKEN   (from `claude setup-token` — uses your Claude subscription)
+# or ANTHROPIC_API_KEY (pay-per-token). The Agent SDK reads whichever is set from the env.
+#
+# Requires a qa.config.json in the repo (here: test/E2E/qa.config.json). Set its "shotsDir"
+# to a path INSIDE the project (e.g. "qa-evidence") so GitLab can collect it as an artifact.
+
+qa-explore:
+  stage: test
+  when: manual                       # trigger from the pipeline UI; or use `rules:` for PRs
+  image: mcr.microsoft.com/playwright:v1.48.0-jammy   # Chromium + system deps preinstalled
+  variables:
+    BASE_URL: "https://staging.example.com"           # your deployed pre-prod / preview
+  script:
+    - git clone --depth 1 https://github.com/victoraguilarsantamariadev/qa-explore.git /tmp/qa-explore
+    - (cd /tmp/qa-explore/runner && npm ci --omit=dev)
+    - >
+      node /tmp/qa-explore/runner/bin/qa-explore.mjs explore
+      --config "$CI_PROJECT_DIR/test/E2E/qa.config.json"
+      --base "$BASE_URL"
+      --mode read-only
+      > "$CI_PROJECT_DIR/qa-explore-result.json" || true
+  artifacts:
+    when: always
+    paths:
+      - qa-explore-result.json
+      - qa-evidence/                 # must match "shotsDir" in qa.config.json
+    expire_in: 1 week

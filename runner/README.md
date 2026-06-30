@@ -44,6 +44,12 @@ jobs:
 
 The action installs the runner + Chromium, runs the skill, and uploads `qa-explore-result.json` + the evidence dir as a build artifact. `mode: read-only` is the safe default for CI; switch to `explore`/`no-delete` only against a throwaway/seeded environment.
 
+Pinned to the `v0` tag. Ready-to-copy workflows live in [`examples/`](../examples): `github-actions.yml` and **`gitlab-ci.yml`** (GitLab has no marketplace action — the job clones this repo and runs the runner directly, using a `CLAUDE_CODE_OAUTH_TOKEN` CI/CD variable).
+
+## GitLab CI
+
+GitLab can't consume a GitHub composite action, so run the runner from a script step — see [`examples/gitlab-ci.yml`](../examples/gitlab-ci.yml). It uses the official Playwright image (Chromium preinstalled), clones the runner, and runs `explore --mode read-only`, reading `CLAUDE_CODE_OAUTH_TOKEN` from a masked CI/CD variable.
+
 ## Tests
 
 ```bash
