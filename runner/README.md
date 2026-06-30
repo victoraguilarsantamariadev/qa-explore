@@ -2,7 +2,7 @@
 
 Run the qa-explore engines **headless** — no interactive Claude Code session — so they work in CI / on a PR. It runs the *exact same* `skills/*/engine/*.workflow.js` files the Claude Code plugin uses, via a thin runtime shim over the [Claude Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk). One engine, two runtimes.
 
-> Status: **v0.3 (dev)**. The runtime shim, CLI and `--dry-run` are validated by `node --test`. The live agent path runs on the Agent SDK — see Auth.
+> Status: **v0.3 (dev)**. The runtime shim, CLI and `--dry-run` are validated by `node --test`; the live agent path (real Agent SDK, text + structured) by `npm run smoke`. See Auth.
 
 ## Install & run locally
 
@@ -47,10 +47,11 @@ The action installs the runner + Chromium, runs the skill, and uploads `qa-explo
 ## Tests
 
 ```bash
-cd runner && node --test
+cd runner && node --test       # offline: shim + engine load + stubbed agent (no tokens)
+cd runner && npm run smoke      # live: real Agent SDK, text + structured (costs a few tokens)
 ```
 
-Covers the runtime shim (pipeline/parallel/phase/log), that the real engine files load and run on the shim with a stubbed agent, and that disabled-tracker short-circuits.
+`node --test` covers the runtime shim (pipeline/parallel/phase/log), that the real engine files load and run on the shim with a stubbed agent, and that disabled-tracker short-circuits. `npm run smoke` exercises the live agent path end-to-end (no browser/target) to confirm the SDK wiring works headless.
 
 ## Roadmap
 
