@@ -250,8 +250,11 @@ log('qa-explore: ' + (EXHAUSTIVE ? 'cobertura EXHAUSTIVA' : 'muestreo') + ' de '
 // ---- Explore + Verify as a reusable pass (initial + completeness rounds) ----
 async function exploreAreas(areaList, state) {
   const sName = (state && state.name) || 'default'
+  const sessionSetup = (state && state.scope === 'session' && state.enter)
+    ? ' This state is SESSION-SCOPED: FIRST put YOUR OWN browser session into it yourself — ' + JSON.stringify(state.enter) + ' — then proceed (other agents do the same in parallel; do not change a global setting).'
+    : ''
   const stateNote = MULTI_STATE
-    ? '\n\n=== APP STATE: "' + sName + '" ===\nThe app is already set to the "' + sName + '" state/mode for this pass. ' + (state.expect || '') + ' Put this area\'s screenshots under ' + SHOTS + '/<AREA_KEY>/' + sName + '/, and PREFIX every finding title with "[' + sName + '] ".'
+    ? '\n\n=== APP STATE: "' + sName + '" ===\nThe app is set to the "' + sName + '" state/mode for this pass.' + sessionSetup + ' ' + (state.expect || '') + ' Put this area\'s screenshots under ' + SHOTS + '/<AREA_KEY>/' + sName + '/, and PREFIX every finding title with "[' + sName + '] ".'
     : ''
   const r = await pipeline(
     areaList,
@@ -276,13 +279,35 @@ async function exploreAreas(areaList, state) {
   return r.filter(Boolean)
 }
 
-// Enter an app state/mode via a setup agent (idempotent) before its pass. No-op for the default state.
+// Robustly ENTER a GLOBAL app state/mode before its pass. The transition is done as a DETERMINISTIC
+// SCRIPT the setup agent writes & runs (NOT click-by-click LLM judgement): fire the action, then poll a
+// readiness predicate while RE-AUTHENTICATING each round and TOLERATING transient 401/403/5xx + connection
+// errors (a mode switch often restarts the backend / invalidates the session / changes the credential),
+// gate on a real authenticated health-check, with a generous configurable timeout. Detect-first (skip if
+// already in the target). manual:true → assume it was set externally, verify only. Session-scoped states
+// are NOT entered here — each area agent sets them per-session (see stateSetup in exploreAreas).
 async function enterState(state) {
-  if (!state || !state.enter) return
+  if (!state || (!state.enter && !state.readyWhen)) return
+  if (state.scope === 'session') return
   phase('Setup')
-  log('qa-explore: entrando al estado de app "' + state.name + '"…')
+  const tSec = Math.round((state.timeoutMs || 180000) / 1000)
+  const pSec = Math.round((state.pollMs || 4000) / 1000)
+  const transient = JSON.stringify(state.expectTransient || [401, 403, 500, 502, 503, 504])
+  log('qa-explore: preparando estado de app "' + state.name + '"…')
   await agent(
-    preamble() + '\n\n=== ENTER APP STATE: "' + state.name + '" ===\nPut the app into this state, then CONFIRM you are actually in it before returning (read back the badge / flag / indicator). This is IDEMPOTENT: if it is already in this state, just confirm. Recipe:\n' + state.enter,
+    preamble() +
+      '\n\n=== ENTER APP STATE: "' + state.name + '" — DETERMINISTIC SETUP, not exploration ===\n' +
+      'CREDENTIALS for this state: ' + (state.login || cfg.login) + '\n' +
+      (state.manual
+        ? 'This state is set MANUALLY/EXTERNALLY — do NOT switch it. VERIFY readiness only: ' + JSON.stringify(state.readyWhen || '(none)') + '. Poll up to ' + tSec + 's; print "READY" when satisfied (after one authenticated request returns 200) or "FAILED: not in state ' + state.name + '".'
+        : 'WRITE AND RUN a script (bash+curl+python3, or node) that performs this transition ROBUSTLY, then return its final line. Do NOT do it click-by-click in the browser. The script MUST:\n' +
+          '  1) login() → returns a FRESH token (try the credential candidates above; use whichever /auth/authenticate returns 200).\n' +
+          '  2) DETECT: check the readiness predicate [' + JSON.stringify(state.readyWhen || 'n/a') + ']. If ALREADY satisfied → print "READY (already)" and exit 0.\n' +
+          '  3) FIRE (authenticated): ' + JSON.stringify(state.enter) + '  — it may return 202 (async).\n' +
+          '  4) POLL every ' + pSec + 's for up to ' + tSec + 's: EACH round call login() AGAIN (the switch invalidates the session and the credential may change between projects), TOLERATE transient HTTP ' + transient + ' and connection errors (the backend restarts mid-switch), then re-check the predicate.\n' +
+          '  5) When the predicate holds, HEALTH-CHECK: one authenticated REAL request (e.g. a list endpoint) must return 200. Only then print "READY".\n' +
+          '  6) On timeout, print "FAILED: <reason>".\n' +
+          'Save the script output to ' + SHOTS + '/state-' + state.name + '.log and return EXACTLY the final READY/FAILED line. If FAILED, that becomes a finding and this state\'s pass is skipped.'),
     { label: 'enter-state:' + state.name, phase: 'Setup', agentType: 'general-purpose' }
   )
 }
