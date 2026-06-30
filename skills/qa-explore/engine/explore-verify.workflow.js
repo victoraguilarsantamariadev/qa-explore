@@ -7,7 +7,7 @@ export const meta = {
   description: 'Reusable exploratory QA: recon the app, fan out human-tester agents that drive a real browser and visually judge rendering + data, then adversarially verify each serious finding. Captures Playwright trace/HAR/console/video as evidence and reuses one login session across agents.',
   phases: [
     { title: 'Recon', detail: 'discover the functional areas/routes to cover (skipped if areas are supplied/cached)' },
-    { title: 'Explore', detail: 'one human-tester agent per area drives a real browser, sweeps viewports, screenshots, judges, captures evidence' },
+    { title: 'Explore', detail: 'one human-tester agent per area drives a real browser, sweeps viewports, runs an axe-core a11y check, screenshots, judges, captures evidence' },
     { title: 'Verify', detail: 'an independent skeptic re-runs each serious finding to confirm it is real' },
     { title: 'Access-control', detail: 'per extra role, an agent checks for broken access control (only when >1 role configured)' },
   ],
@@ -40,6 +40,8 @@ const PTYPE = cfg.projectType || 'web-spa'
 const isWeb = PTYPE === 'web-spa' || PTYPE === 'web-ssr'
 const usesBrowser = isWeb || PTYPE === 'electron'
 const NEEDS_WEBKIT = VIEWPORTS.some((v) => v.browser === 'webkit')
+// Accessibility (axe-core) is a free extra pass on web targets; set cfg.a11y=false to skip it.
+const A11Y = isWeb && cfg.a11y !== false
 const vdesc = (v) => {
   const eng = v.browser && v.browser !== 'chromium' ? ', engine:' + v.browser : ''
   return v.playwrightDevice
@@ -59,6 +61,19 @@ function viewportBlock() {
   return lines.join('\n')
 }
 
+function a11yBlock() {
+  if (!A11Y) return ''
+  return [
+    'ACCESSIBILITY (axe-core) — a free extra pass on this area\'s KEY screens:',
+    '  - Install once: npm i -D @axe-core/playwright (it injects axe from node_modules, so the app CSP does NOT block it — do NOT load axe from a CDN).',
+    '  - On 2–4 representative screens of this area (e.g. a list, a form, a detail/dashboard), after the screen settles run:',
+    '      const AxeBuilder = (await import("@axe-core/playwright")).default;',
+    '      const r = await new AxeBuilder({ page }).withTags(["wcag2a","wcag2aa"]).analyze();',
+    '  - Report ONLY violations with impact "critical" or "serious" (ignore minor/moderate to avoid noise), DEDUPED by rule id across screens. For each: severity "minor", confidence "hard-evidence", title prefixed "[a11y] <ruleId>", evidence = the rule id + help URL + a failing selector + which screen. Cap at the ~8 most impactful and say how many more were dropped.',
+    '  - These are real WCAG 2 A/AA failures (missing form labels/alt text, color-contrast, name-role-value, etc.) — concrete, not a "looks wrong" judgement.',
+  ].join('\n')
+}
+
 function handsBlock(stateFile) {
   if (PTYPE === 'api') return 'HOW YOU ACT: this is an API target — no browser. Exercise the HTTP API directly (curl/fetch). "Seeing" = reading status codes, headers and JSON bodies. JUDGE: correct status codes, response shape/schema, plausible data, error handling for bad input, auth enforced. Save raw request+response into ' + SHOTS + '/<AREA_KEY>/ as evidence.'
   if (PTYPE === 'cli') return 'HOW YOU ACT: this is a CLI target — no browser. Run the commands. "Seeing" = reading stdout/stderr and exit codes. JUDGE: correct exit codes, helpful errors, sane output, idempotency, no leaking stack traces. Save command + output into ' + SHOTS + '/<AREA_KEY>/ as evidence.'
@@ -72,7 +87,8 @@ function handsBlock(stateFile) {
     '  - EVIDENCE (mandatory, this is what makes a finding credible): create the context with recordVideo:{ dir: "' + SHOTS + '/<AREA_KEY>/video" } and recordHar:{ path: "' + SHOTS + '/<AREA_KEY>/network.har" }; call context.tracing.start({ screenshots:true, snapshots:true, sources:true }) at the start; subscribe page.on("console") and page.on("pageerror") and append every line to ' + SHOTS + '/<AREA_KEY>/console.log. When you hit a finding, call context.tracing.stop({ path: "' + SHOTS + '/<AREA_KEY>/trace-<n>.zip" }) capturing that repro. Attach the trace/har/video/console paths and the exact console/HTTP error to the finding.',
     '  - Screenshot EVERY meaningful step into ' + SHOTS + '/<AREA_KEY>/NN-step.png (mkdir -p first). Then use the Read tool on the meaningful PNGs to actually LOOK at them — this visual check is the core of the job; never claim something looks right without having read its screenshot.',
     viewportBlock(),
-  ].join('\n')
+    a11yBlock(),
+  ].filter(Boolean).join('\n')
 }
 
 function preamble(extra, role) {

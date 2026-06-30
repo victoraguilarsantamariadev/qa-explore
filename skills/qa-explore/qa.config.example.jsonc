@@ -27,6 +27,10 @@
   // the browser for HTTP/CLI calls (same explore→verify→report loop, different tool).
   "projectType": "web-spa",                 // "web-spa" | "web-ssr" | "electron" | "api" | "cli"
 
+  // Free extra pass: run axe-core (WCAG 2 A/AA) on each area's key screens and report only
+  // critical/serious violations (deduped, capped). On by default for web targets; set false to skip.
+  "a11y": true,
+
   // Plain-prose login recipe the agents follow (be exact: selectors, the response to wait for,
   // where the token goes). Point at a project login helper if one exists. Leave "" if the app is open.
   "login": "Username 'user', password '...'. Fill #user / #pass, click [type=submit], wait for /api/login 200.",
