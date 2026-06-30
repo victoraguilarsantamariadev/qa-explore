@@ -56,6 +56,32 @@
     // { "name": "viewer", "login": "Fill #user 'viewer' / #pass '...'; wait /api/login 200." }
   ],
 
+  // App STATES/MODES — the whole suite re-runs in EACH, so you test every mode, not just the active one.
+  // The FIRST (or one with "default":true) is primary (no setup). Each EXTRA declares how to ENTER it
+  // (a plain-prose recipe an agent runs: a UI toggle, an API call, a flag) and optionally how to EXIT;
+  // "expect" tells agents what is NORMAL in that mode (so e.g. read-only rejections aren't flagged as bugs).
+  // States run SEQUENTIALLY (a mode switch is global); the app is restored to the primary state at the end.
+  // Every finding is tagged [<state>]. The agent toggling the mode runs inside the authorized run, which is
+  // also how it sidesteps host-mutation permission prompts a direct API call would hit.
+  //
+  // Modes worth declaring, by platform (declare only the ones your app actually has):
+  //   ANY (web/desktop/mobile): simulation/demo/sandbox vs real; a feature flag ON/OFF; an A/B variant;
+  //     maintenance mode; empty-state (fresh account) vs populated; plan tier free/pro/enterprise;
+  //     authenticated vs guest/anonymous; tenant/workspace/project switch; light/dark/high-contrast theme.
+  //   WEB:     cookie-consent accepted/declined; prefers-reduced-motion; SSR vs hydrated.
+  //   DESKTOP (electron/tauri): offline vs online; auto-update pending; window maximized/fullscreen; OS theme.
+  //   MOBILE:  offline / low-bandwidth; a permission granted vs denied (camera/location/notifications);
+  //     portrait/landscape; large dynamic-type font; battery-saver; biometric on/off.
+  // Omit / [] → a single default state (current behaviour, no setup step).
+  "appStates": [
+    // { "name": "real", "default": true,
+    //   "enter": "Ensure NORMAL (non-demo) mode: check the mode indicator; if in demo/simulation, switch it off." },
+    // { "name": "simulation",
+    //   "expect": "Writes are read-only BY DESIGN here — a rejected create/edit/delete is CORRECT, not a bug.",
+    //   "enter": "Enter demo mode: go to /settings/mode and toggle Simulation ON (or POST /api/project/simulation {enabled:true}); confirm the badge.",
+    //   "exit":  "Toggle Simulation OFF again." }
+  ],
+
   // Where to put screenshots, evidence (trace/HAR/video/console) and the generated report.
   // The shared login session is cached here as storageState.json and reused by every agent.
   "shotsDir": "/tmp/qa-explore",

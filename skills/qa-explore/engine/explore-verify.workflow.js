@@ -7,6 +7,7 @@ export const meta = {
   description: 'Reusable exploratory QA: recon the app, fan out human-tester agents that drive a real browser and visually judge rendering + data, then adversarially verify each serious finding. Captures Playwright trace/HAR/console/video as evidence and reuses one login session across agents.',
   phases: [
     { title: 'Recon', detail: 'discover the functional areas/routes to cover (skipped if areas are supplied/cached)' },
+    { title: 'Setup', detail: 'enter each declared app state/mode (e.g. simulation/demo, a feature flag, offline, dark theme) before its pass; only when >1 appState configured' },
     { title: 'Explore', detail: 'one human-tester agent per area drives a real browser, sweeps viewports, runs an axe-core a11y check, screenshots, judges, captures evidence' },
     { title: 'Verify', detail: 'an independent skeptic re-runs each serious finding to confirm it is real' },
     { title: 'Access-control', detail: 'per extra role, an agent checks for broken access control (only when >1 role configured)' },
@@ -42,6 +43,12 @@ const usesBrowser = isWeb || PTYPE === 'electron'
 const NEEDS_WEBKIT = VIEWPORTS.some((v) => v.browser === 'webkit')
 // Accessibility (axe-core) is a free extra pass on web targets; set cfg.a11y=false to skip it.
 const A11Y = isWeb && cfg.a11y !== false
+// App states/modes (simulation/demo, feature flags, offline, theme, plan tier, tenant, …). The whole
+// suite re-runs in EACH declared state so the app is tested in every mode, not just the active one.
+// The first/`default` state needs no enter recipe; extras declare how to enter (and optionally exit).
+const APP_STATES = (cfg.appStates && cfg.appStates.length) ? cfg.appStates : [{ name: 'default', default: true }]
+const PRIMARY_STATE = APP_STATES.find((s) => s.default) || APP_STATES[0]
+const MULTI_STATE = APP_STATES.length > 1
 const vdesc = (v) => {
   const eng = v.browser && v.browser !== 'chromium' ? ', engine:' + v.browser : ''
   return v.playwrightDevice
@@ -241,31 +248,47 @@ if (areas.length > HARD_CAP) { log('⚠️ qa-explore: ' + areas.length + ' unid
 log('qa-explore: ' + (EXHAUSTIVE ? 'cobertura EXHAUSTIVA' : 'muestreo') + ' de ' + areas.length + ' unidad(es) → ' + areas.map((a) => a.key).join(', '))
 
 // ---- Explore + Verify as a reusable pass (initial + completeness rounds) ----
-async function exploreAreas(areaList) {
+async function exploreAreas(areaList, state) {
+  const sName = (state && state.name) || 'default'
+  const stateNote = MULTI_STATE
+    ? '\n\n=== APP STATE: "' + sName + '" ===\nThe app is already set to the "' + sName + '" state/mode for this pass. ' + (state.expect || '') + ' Put this area\'s screenshots under ' + SHOTS + '/<AREA_KEY>/' + sName + '/, and PREFIX every finding title with "[' + sName + '] ".'
+    : ''
   const r = await pipeline(
     areaList,
     (a) => agent(
-      preamble() + '\n\n=== YOUR AREA: ' + a.label + ' ===\nAREA_KEY (for screenshots + prefixes): ' + a.key + '\n\nMISSION:\n' + a.mission,
-      { label: 'explore:' + a.key, phase: 'Explore', schema: FINDINGS_SCHEMA, agentType: 'general-purpose' }
+      preamble() + '\n\n=== YOUR AREA: ' + a.label + ' ===\nAREA_KEY (for screenshots + prefixes): ' + a.key + '\n\nMISSION:\n' + a.mission + stateNote,
+      { label: 'explore:' + a.key + (MULTI_STATE ? '@' + sName : ''), phase: 'Explore', schema: FINDINGS_SCHEMA, agentType: 'general-purpose' }
     ),
     (res, a) => {
       if (!res) return null
       const serious = (res.findings || []).filter((f) => f.severity === 'blocker' || f.severity === 'major')
-      if (serious.length === 0) return { area: a.label, key: a.key, explore: res, verify: { verdicts: [] } }
+      if (serious.length === 0) return { area: a.label, key: a.key, state: sName, explore: res, verify: { verdicts: [] } }
       const list = serious
         .map((f, i) => (i + 1) + '. [' + f.severity + '/' + f.confidence + '] ' + f.title + '\n   what happened: ' + f.whatHappened + '\n   repro: ' + f.repro + '\n   evidence: ' + (f.evidence || 'none') + '\n   trace: ' + (f.trace || 'none'))
         .join('\n')
       return agent(
         preamble() +
-          '\n\n=== VERIFY MODE (independent skeptic) ===\nAnother tester reported the issues below in area "' + a.label + '". Re-run EACH repro yourself from a fresh context, capture a trace, and READ the screenshot. Mark confirmed=true ONLY if you actually reproduce the problem. If it works for you (often because the original judged a mid-selection or intentional-empty state — see the KNOWN-CORRECT notes), mark confirmed=false. Default to skeptical.\n\nISSUES:\n' + list,
-        { label: 'verify:' + a.key, phase: 'Verify', schema: VERIFY_SCHEMA, agentType: 'general-purpose' }
-      ).then((v) => ({ area: a.label, key: a.key, explore: res, verify: v || { verdicts: [] } }))
+          '\n\n=== VERIFY MODE (independent skeptic) ===\nAnother tester reported the issues below in area "' + a.label + '". Re-run EACH repro yourself from a fresh context, capture a trace, and READ the screenshot. Mark confirmed=true ONLY if you actually reproduce the problem. If it works for you (often because the original judged a mid-selection or intentional-empty state — see the KNOWN-CORRECT notes), mark confirmed=false. Default to skeptical.\n\nISSUES:\n' + list + stateNote,
+        { label: 'verify:' + a.key + (MULTI_STATE ? '@' + sName : ''), phase: 'Verify', schema: VERIFY_SCHEMA, agentType: 'general-purpose' }
+      ).then((v) => ({ area: a.label, key: a.key, state: sName, explore: res, verify: v || { verdicts: [] } }))
     }
   )
   return r.filter(Boolean)
 }
 
-let clean = await exploreAreas(areas)
+// Enter an app state/mode via a setup agent (idempotent) before its pass. No-op for the default state.
+async function enterState(state) {
+  if (!state || !state.enter) return
+  phase('Setup')
+  log('qa-explore: entrando al estado de app "' + state.name + '"…')
+  await agent(
+    preamble() + '\n\n=== ENTER APP STATE: "' + state.name + '" ===\nPut the app into this state, then CONFIRM you are actually in it before returning (read back the badge / flag / indicator). This is IDEMPOTENT: if it is already in this state, just confirm. Recipe:\n' + state.enter,
+    { label: 'enter-state:' + state.name, phase: 'Setup', agentType: 'general-purpose' }
+  )
+}
+
+await enterState(PRIMARY_STATE)
+let clean = await exploreAreas(areas, PRIMARY_STATE)
 
 // ---- Completeness loop (exhaustive only): a critic finds inventory items not yet exercised; cover the gaps; repeat until dry ----
 if (EXHAUSTIVE) {
@@ -285,7 +308,7 @@ if (EXHAUSTIVE) {
     if (!gaps.length) break
     log('qa-explore: ronda ' + round + ' → cubriendo ' + gaps.length + ' hueco(s): ' + gaps.map((g) => g.key).join(', '))
     gaps.forEach((g) => coveredKeys.add(g.key))
-    clean = clean.concat(await exploreAreas(gaps))
+    clean = clean.concat(await exploreAreas(gaps, PRIMARY_STATE))
     areas = areas.concat(gaps)
   }
 }
@@ -305,6 +328,15 @@ if (ROLES.length > 1) {
   ))
   authz = raw.filter(Boolean)
 }
+
+// ---- Extra app states: re-run the whole area suite in each non-primary declared state ----
+for (const state of APP_STATES) {
+  if (state === PRIMARY_STATE) continue
+  await enterState(state)
+  log('qa-explore: pasada de estado "' + state.name + '" sobre ' + areas.length + ' área(s)')
+  clean = clean.concat(await exploreAreas(areas, state))
+}
+if (MULTI_STATE && PRIMARY_STATE.enter) { await enterState(PRIMARY_STATE) } // leave the app in the resting state
 
 const all = [...clean, ...authz]
 let total = 0, hard = 0
