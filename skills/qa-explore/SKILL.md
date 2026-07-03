@@ -10,7 +10,7 @@ A reusable harness that tests any web app the way a human QA team would, then tu
 ## The loop
 
 ```
-Step 0  RUN EXISTING SUITE (deterministic, full, cheap)  — your regression net; skipped on a cold project
+Step 0  RUN EXISTING SUITE (deterministic, full, cheap)  — regression net; AUTO-run by the engine's first phase (skipped on a cold project)
 1. EXPLORE  one human-tester agent per area: navigate, create, fill, submit, screenshot, judge, capture evidence
 2. VERIFY   independent skeptics re-run each serious finding (flaky / false-positive killer)
 3. REPORT   file each verify-confirmed finding as a tracker issue (GitLab/GitHub), idempotently   [if tracker configured]
@@ -53,7 +53,7 @@ Rules regardless of mode:
 
 2b. **Coverage mode (`coverage.mode`).** `sample` (default) = one agent per functional area (≤ `maxAreas`): a thorough human-style pass, broad but not guaranteed-complete. `exhaustive` = recon builds a full **inventory** (every route, entity, and enumerable variant — e.g. *every* widget type) and fans out **one unit of work per item** (a separate "create a `<X>` widget" per type, full CRUD per entity, a visit per route), then a **completeness-critic loops** over the inventory covering any gap until none remain (or `maxRounds`/`maxUnits` — drops are **logged, never silent**). Use `exhaustive` when the user wants "test absolutely everything"; expect more tokens (the cost lever is scope, not model). For `exhaustive`, point `sourceHints` at the routes + the widget/component registry + API.
 
-3. **Step 0 — existing suite (the regression net).** ALWAYS run the full deterministic suite if one exists in `e2eDir` (`npx playwright test --reporter=line,json`), even in diff mode — this is what catches a PR breaking an untouched area. Parse results, summarize pass/fail. No suite yet → "cold start, skipping Step 0". Reminder: failing baseline tests are often stale selectors, not app bugs — the explore pass adjudicates which. (The agent scope is cheap-cut; the deterministic net is never cut.)
+3. **Step 0 — existing suite (the regression net).** This is **automated: the `explore-verify` engine runs it as its FIRST phase** — no manual step. If a deterministic suite EXISTS in `e2eDir` (warm project) it runs the full suite (`npx playwright test --reporter=line,json`, targeting the config `baseUrl`, ~10-min cap); if NONE exists (cold project) it logs "cold start, skipping Step 0". The pass/fail summary is returned as a `step0` entry in the results. Reminder: failing baseline tests are often **stale selectors**, not app bugs — the explore pass adjudicates which, so Step-0 failures are surfaced but NOT auto-counted as confirmed findings. (The agent scope is cheap-cut; the deterministic net is never cut.)
 
 4. **Explore + Verify.** `Workflow({ scriptPath: "<engine>/explore-verify.workflow.js", args: <config-with-scoped-areas> })`. Agents reuse one login session (`storageState.json`) and capture trace/HAR/console/video per finding. It returns confirmed findings per area.
 
@@ -72,3 +72,5 @@ Rules regardless of mode:
 ## Notes
 - Generalizes best to web/UI apps (the agents' "hands" are a browser). For pure APIs/CLIs the same explore→verify→codify loop applies with HTTP/CLI calls instead of Playwright.
 - `domainNotes` is the single biggest lever against false positives and it auto-grows via step 6 — keep it in the repo so the whole team benefits.
+- **Stateful-SPA heuristics (auto-applied by the explore engine).** Single-op, reload-between passes miss whole classes of bug. The agents now: **sequence-test** each entity (create AND delete 2-3 in a row WITHOUT reloading); flag **stale-state leaks** (a success/error toast that re-fires just from navigating, or a form that self-redirects on mount — a shared singleton/store holding a terminal state); enforce **notification hygiene** (plain navigation must fire no toast; no duplicate toasts per action); and check **cross-entity parity** (a shared flow — bulk-select+delete, create-form, save-toast, row confirm-modal — must behave identically on EVERY entity; a divergence like "bulk-delete works on installations but does nothing on devices" is the finding). These catch the singleton/DI-state bugs that a full reload masks.
+- **Run a second pass against a DEV build** (e.g. `baseUrl: http://localhost:5173`) when the app has one. React StrictMode (dev only) double-invokes effects and surfaces "fires twice / missing cleanup" side-effect bugs (duplicate toasts, double requests) that the production build hides. Model it as an extra `appStates` entry or just a second run with the dev `baseUrl`.

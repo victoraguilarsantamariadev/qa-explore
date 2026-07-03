@@ -6,6 +6,7 @@ export const meta = {
   name: 'qa-explore-engine',
   description: 'Reusable exploratory QA: recon the app, fan out human-tester agents that drive a real browser and visually judge rendering + data, then adversarially verify each serious finding. Captures Playwright trace/HAR/console/video as evidence and reuses one login session across agents.',
   phases: [
+    { title: 'Step 0', detail: 'run the existing deterministic suite (regression net) if one exists; skipped on a cold project' },
     { title: 'Recon', detail: 'discover the functional areas/routes to cover (skipped if areas are supplied/cached)' },
     { title: 'Setup', detail: 'enter each declared app state/mode (e.g. simulation/demo, a feature flag, offline, dark theme) before its pass; only when >1 appState configured' },
     { title: 'Explore', detail: 'one human-tester agent per area drives a real browser, sweeps viewports, runs an axe-core a11y check, screenshots, judges, captures evidence' },
@@ -119,6 +120,11 @@ function preamble(extra, role) {
     handsBlock(stateFile),
     '',
     'JUDGE on every screen: (1) RENDERING — broken/overlapping layout, blank/white areas, stuck spinners, error toasts, missing icons, untranslated i18n keys, literal undefined/null/NaN text, cut-off content. (2) DATA SENSE — plausible numbers, correct units, right labels/legends/axes, totals that add up, sane dates; distinguish a legitimate empty-state from a broken one. (3) FLOW — buttons respond, forms validate bad input, Save persists across reload, edits stick, deletes remove, navigation lands where expected, submissions report success.',
+    '(4) STATE, SEQUENCE & NOTIFICATIONS — this is a stateful SPA whose stores/singletons LEAK across in-app navigation, and a full reload MASKS those bugs, so NEVER judge a flow from a single op:',
+    '    • SEQUENCE: create AND delete the SAME entity 2-3 times in a row WITHOUT reloading between (e.g. Save → land on list → click New again → does the form open, or does it bounce straight back / block the second create?).',
+    '    • STALE STATE: after an action that shows a success/error toast, navigate AWAY and BACK (do NOT reload) — a "created/deleted/saved successfully" toast that RE-FIRES just from navigating, or a form that self-submits/redirects on mount, is a stale-singleton finding.',
+    '    • NOTIFICATION HYGIENE: plain navigation must trigger NO success/error toast. Any toast that appears without a matching user action = finding. Also flag DUPLICATE toasts for a single action.',
+    '    • CROSS-ENTITY PARITY: shared patterns (bulk-select + delete, the create form, the save-toast, the row confirm-modal) must behave IDENTICALLY across EVERY entity that has them. If bulk-delete (or any shared flow) works on one entity but does nothing / opens a 2nd modal / duplicates on another, that DIVERGENCE is the finding — test the shared pattern on each entity, do not assume.',
     '',
     'CRITICAL anti-false-positive rules (learned the hard way):',
     '  - COMPLETE every flow before judging: confirm pickers/data-sources, click the final confirm/✓, wait for the network to settle. A disabled Save button or empty preview seen MID-selection is NOT a bug.',
@@ -228,6 +234,31 @@ const INVENTORY_SCHEMA = {
   required: ['areas'],
 }
 
+// ---- Step 0: run the EXISTING deterministic suite (the regression net) BEFORE exploring ----
+// Warm project (a suite exists) → run it; cold project (no suite) → skip. Never writes/fixes tests.
+const STEP0_SCHEMA = {
+  type: 'object',
+  properties: {
+    ran: { type: 'boolean', description: 'true if a suite existed and was executed; false on cold start (no suite found)' },
+    total: { type: 'number' }, passed: { type: 'number' }, failed: { type: 'number' }, skipped: { type: 'number' },
+    failingSpecs: { type: 'array', items: { type: 'string' }, description: 'failing spec file paths or test titles' },
+    timedOut: { type: 'boolean' },
+    note: { type: 'string', description: 'short summary; on cold start, say no suite was found' },
+  },
+  required: ['ran', 'note'],
+}
+phase('Step 0')
+const step0 = await agent(
+  'STEP 0 — run the project\'s EXISTING deterministic E2E suite as the regression net, BEFORE any exploration. Do NOT write, scaffold or fix tests — only run what exists and report.\n' +
+  '1. cd into ' + E2E + '. Detect whether a ' + (cfg.framework || 'playwright') + ' suite EXISTS: look for a config (playwright.config.* / cypress.config.*) AND spec files (glob **/*.spec.* / **/*.cy.*). If NONE exist → this is a COLD start: return {ran:false, note:"cold start — no existing suite, skipped"} and stop.\n' +
+  '2. If a suite EXISTS, RUN it: `npx playwright test --reporter=line,json` (or the project\'s own test script). If its config reads a host/base URL from an env var, set it so the suite targets ' + BASE + ' (e.g. `EVOLUTION_HOST=' + baseHost + ' npx playwright test ...`). Cap the run at ~10 minutes: if it exceeds, kill it, set timedOut:true and report whatever pass/fail you captured.\n' +
+  '3. Parse the reporter output and return {ran:true,total,passed,failed,skipped,failingSpecs,timedOut,note}. IMPORTANT: a failing baseline test is often a STALE SELECTOR/assertion, not an app bug — do NOT treat Step-0 failures as confirmed findings; they are flagged for the explore pass to adjudicate.',
+  { label: 'step0-suite', phase: 'Step 0', schema: STEP0_SCHEMA, agentType: 'general-purpose' }
+)
+if (step0) log('qa-explore Step 0: ' + (step0.ran
+  ? ((step0.passed || 0) + '/' + (step0.total || 0) + ' passed' + (step0.failed ? ', ' + step0.failed + ' FAILED (' + (step0.failingSpecs || []).slice(0, 6).join(', ') + ')' : '') + (step0.timedOut ? ' [timed out]' : ''))
+  : 'cold start — skipped'))
+
 // ---- Recon: discover areas if not supplied (the skill caches/diff-scopes them) ----
 let areas = (cfg.areas && cfg.areas.length) ? cfg.areas : null
 let inventory = null
@@ -236,7 +267,7 @@ if (!areas) {
   const reconExtra = EXHAUSTIVE
     ? '\n\n=== RECON MODE (EXHAUSTIVE — leave nothing untested) ===\nProduce a COMPLETE INVENTORY. ' +
       (cfg.sourceHints ? 'Read the routes/router + component/widget registries + API here to ENUMERATE everything: ' + cfg.sourceHints + '. ' : 'Read the source (routes, component/widget registries, API) AND crawl the live nav to ENUMERATE everything. ') +
-      'Return (1) "inventory": EVERY route, EVERY CRUD entity type, EVERY enumerable VARIANT family with each item listed (e.g. all widget types, all device types, all chart types), and the key actions; and (2) "areas": FINE-GRAINED missions, ONE per unit of work, so EACH route is visited, EACH entity gets full CRUD, and EACH variant is exercised on its own (e.g. a separate mission "create a <X> widget" for EVERY widget type — do NOT collapse variants into one mission). Do not cap arbitrarily; list them all (up to ' + HARD_CAP + ').'
+      'Return (1) "inventory": EVERY route, EVERY CRUD entity type, EVERY enumerable VARIANT family with each item listed (e.g. all widget types, all device types, all chart types), and the key actions; and (2) "areas": FINE-GRAINED missions, ONE per unit of work, so EACH route is visited, EACH entity gets full CRUD, and EACH variant is exercised on its own (e.g. a separate mission "create a <X> widget" for EVERY widget type — do NOT collapse variants into one mission). ALSO emit, for EACH CRUD entity: a SEQUENCE mission "create 2-3 <entity> back-to-back WITHOUT reloading, then delete 2-3 back-to-back" (catches stale-singleton/state-leak bugs a single op hides); and a SHARED-PATTERN PARITY mission per shared flow (bulk-select+delete, create-form, save-toast, row confirm-modal) that exercises it on EVERY entity that has it and compares (a flow working on one entity but broken/duplicated on another is the bug). Do not cap arbitrarily; list them all (up to ' + HARD_CAP + ').'
     : '\n\n=== RECON MODE ===\nYour ONLY job now is to produce the list of functional areas/routes worth testing. ' +
       (cfg.sourceHints ? 'Read the route/router definitions here to enumerate routes: ' + cfg.sourceHints + '. ' : '') +
       'Also log in and open the navigation menu to see what sections exist. Return up to ' + (cfg.maxAreas || 10) + ' areas; each needs a short kebab key, a label, and a concrete one-paragraph mission of the real user actions to exercise there (list, create, fill forms, submit, view charts, edit, delete).'
@@ -363,7 +394,13 @@ for (const state of APP_STATES) {
 }
 if (MULTI_STATE && PRIMARY_STATE.enter) { await enterState(PRIMARY_STATE) } // leave the app in the resting state
 
-const all = [...clean, ...authz]
+const step0Entry = {
+  area: 'Step 0 — deterministic regression suite', key: 'step0', state: 'default',
+  step0: step0 || { ran: false, note: 'not run' },
+  explore: { area: 'Step 0', flowsExercised: [], worksWell: [], findings: [] },
+  verify: { verdicts: [] },
+}
+const all = [step0Entry, ...clean, ...authz]
 let total = 0, hard = 0
 for (const r of all) for (const f of (r.explore.findings || [])) { total++; if (f.confidence === 'hard-evidence') hard++ }
 log('qa-explore terminado: ' + total + ' hallazgos (' + hard + ' con evidencia dura) en ' + all.length + ' áreas' + (authz.length ? ' (incl. ' + authz.length + ' de control de acceso)' : '') + '.')
