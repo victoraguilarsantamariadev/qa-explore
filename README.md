@@ -67,6 +67,8 @@ recon + ORDER features as a real setup sequence → you approve the TOC + audien
 - **Adversarial verification** — every serious finding is re-run by an independent skeptic before you ever see it.
 - **Auto-learning** — when you reject a finding as not-a-bug, the reason is appended to the project's `domainNotes`, so the same false positive is never raised again. The harness gets smarter per project.
 - **Real evidence** — Playwright trace.zip, network HAR, console log and video per finding. Reproducing is one click in the trace viewer.
+- **One run, many passes** — a single explore fans out across your app's **modes × viewports × roles**: it re-runs the whole sweep in **every operational mode** you declare (simulation/demo, a feature flag, offline, a theme, a plan tier, a tenant — findings tagged by mode), re-walks key screens at **every viewport** with a mobile/responsive checklist, and (per extra role) hunts **broken access control**.
+- **Free accessibility pass** — axe-core (WCAG 2 A/AA) runs on each area's key screens and reports only critical/serious violations, deduped. Concrete WCAG failures (missing labels/alt text, contrast, name-role-value), not a "looks wrong" call. On by default for web.
 - **Stateful-SPA bug hunting** — it sequence-tests each entity (create/delete several in a row *without* reloading), flags stale-state and duplicate/phantom toasts, and checks **cross-entity parity** (a shared flow — bulk-delete, save-toast, confirm-modal — must behave identically on every entity). Catches the singleton/DI-state bugs a reload-between-passes hides.
 - **It closes the loop** — confirmed bugs become failing regression tests; working flows become passing smoke tests. Self-validated (run once) before they're kept.
 
@@ -99,6 +101,9 @@ Copy [`skills/qa-explore/qa.config.example.jsonc`](skills/qa-explore/qa.config.e
 | `viewports` | first = primary full pass; extras = responsive sweeps (e.g. `iPhone 13`) — **mobile + desktop** |
 | `roles` | first = primary; each extra triggers an **access-control** pass (broken-authorization hunting) |
 | `projectType` | `web-spa` / `web-ssr` (Chromium) · `electron` (desktop) · `api` / `cli` (HTTP/CLI, no browser) |
+| `appStates` | your app's operational **modes** (simulation/demo, a feature flag, offline, dark theme, plan tier, tenant…) — the whole run **re-executes in each**, so you test every mode, not just the active one (findings tagged by mode) |
+| `a11y` | axe-core accessibility pass (WCAG 2 A/AA) — **on by default** for web; set `false` to skip |
+| `coverage` | `mode`: `sample` (one agent per area, default) or `exhaustive` (inventory every route/entity/variant + a completeness-critic loop) |
 | `tracker` | optional — wire up the issue→fix→MR loop: `type` (`gitlab`/`github`/`none`), `host`, `project`, `tokenEnv` (PAT with `api` scope), `fixLabel`, `defaultBranch`, `attachEvidence` |
 | `fix` | how `/qa-fix` runs: `fixStrategy`, `maxFixes`, `buildTest`, `localRun`, `verify` |
 
@@ -138,9 +143,9 @@ A full exploration is token-heavy. Keep your best model everywhere and control c
 ## Roadmap
 
 - v0.1 — Claude Code plugin: explore → verify → triage → codify.
-- v0.2 — **the full loop (this):** GitLab/GitHub issue reporter with embedded evidence; `/qa-fix` (labelled issue → isolated-worktree fix → regression test → independent verify → MR); `/qa-heal` (self-healing suite); `/qa-manual` (living user/config documentation from the same drive-your-app engine); multi-viewport (mobile/desktop), multi-role + access-control, project-type switch (web / electron / API / CLI); safe modes + host confinement.
+- v0.2 — **the full loop (this):** GitLab/GitHub issue reporter with embedded evidence; `/qa-fix` (labelled issue → isolated-worktree fix → regression test → independent verify → MR); `/qa-heal` (self-healing suite); `/qa-manual` (living user/config documentation from the same drive-your-app engine); multi-viewport (mobile/desktop), multi-**mode** (appStates — re-run in every operational state), multi-role + access-control, an **axe-core a11y** pass, project-type switch (web / electron / API / CLI); safe modes + host confinement.
 - v0.3 — a **standalone runner** (`runner/`, Claude Agent SDK) + **GitHub Action** (`runner@v0`) **and a GitLab CI job** so it runs in CI / on PRs without an interactive session, on your subscription. Same engine via a runtime shim; shim + CLI validated (`node --test`), the live agent path by a live smoke (`npm run smoke`, real SDK). Copy-paste CI configs in [`examples/`](examples). Run it against a deployed preview with `CLAUDE_CODE_OAUTH_TOKEN`.
-- Next — **visual regression** (screenshot diffing); **a11y (axe)** and **perf (Lighthouse)** passes; **Jira / Linear** reporters + SARIF; a `qa-explore init` wizard; inline PR-comment findings.
+- Next — **visual regression** (screenshot diffing); a **perf (Lighthouse)** pass; **Jira / Linear** reporters + SARIF; a `qa-explore init` wizard; inline PR-comment findings.
 
 ## License
 
