@@ -46,11 +46,28 @@ behaviour is gone / assertion no longer matches the app → REAL REGRESSION → 
 - **Cold start (no tests yet):** Step 0 is empty and skipped — agents explore first, then write the *first* suite. (Writing tests blind from source gives brittle, stale-selector tests; exploration is what makes good tests possible.)
 - **Warm:** Step 0 runs the accumulated suite cheaply (catches regressions even in untouched areas), agents hunt only for what's **new**, the suite grows.
 
+### …and writes your docs too — `/qa-manual`
+
+The same "an agent that operates your app" engine, pointed at a different output: a **living user / configuration manual** instead of a bug report.
+
+```
+recon + ORDER features as a real setup sequence → you approve the TOC + audience  [gate]
+→ one coherent example built up SECTION BY SECTION (drive the happy-path, create clean
+  data, capture ANNOTATED screenshots) → assemble a Markdown master → you review  [gate]
+→ export to Word / PDF / HTML (pandoc); re-run when the UI drifts
+```
+
+- Walks the recommended happy-path **in setup order** (dependencies first), builds **one coherent clean example** across the whole manual, and annotates every screenshot.
+- **Audience is a knob** — the same app yields an *installer / configuration* guide or an *end-user / daily-use* guide by changing `audience` (+ the table of contents).
+- Two human gates (approve the TOC up front, review the draft before it ships) — never publish auto-docs blind. It won't document a flow with an open bug.
+- The Markdown is the master; it **re-generates when the UI drifts**, so the docs update instead of rotting.
+
 ## What makes it different from "a bot that clicks"
 
 - **Adversarial verification** — every serious finding is re-run by an independent skeptic before you ever see it.
 - **Auto-learning** — when you reject a finding as not-a-bug, the reason is appended to the project's `domainNotes`, so the same false positive is never raised again. The harness gets smarter per project.
 - **Real evidence** — Playwright trace.zip, network HAR, console log and video per finding. Reproducing is one click in the trace viewer.
+- **Stateful-SPA bug hunting** — it sequence-tests each entity (create/delete several in a row *without* reloading), flags stale-state and duplicate/phantom toasts, and checks **cross-entity parity** (a shared flow — bulk-delete, save-toast, confirm-modal — must behave identically on every entity). Catches the singleton/DI-state bugs a reload-between-passes hides.
 - **It closes the loop** — confirmed bugs become failing regression tests; working flows become passing smoke tests. Self-validated (run once) before they're kept.
 
 ## Install (Claude Code)
@@ -121,7 +138,7 @@ A full exploration is token-heavy. Keep your best model everywhere and control c
 ## Roadmap
 
 - v0.1 — Claude Code plugin: explore → verify → triage → codify.
-- v0.2 — **the full loop (this):** GitLab/GitHub issue reporter with embedded evidence; `/qa-fix` (labelled issue → isolated-worktree fix → regression test → independent verify → MR); `/qa-heal` (self-healing suite); multi-viewport (mobile/desktop), multi-role + access-control, project-type switch (web / electron / API / CLI); safe modes + host confinement.
+- v0.2 — **the full loop (this):** GitLab/GitHub issue reporter with embedded evidence; `/qa-fix` (labelled issue → isolated-worktree fix → regression test → independent verify → MR); `/qa-heal` (self-healing suite); `/qa-manual` (living user/config documentation from the same drive-your-app engine); multi-viewport (mobile/desktop), multi-role + access-control, project-type switch (web / electron / API / CLI); safe modes + host confinement.
 - v0.3 — a **standalone runner** (`runner/`, Claude Agent SDK) + **GitHub Action** (`runner@v0`) **and a GitLab CI job** so it runs in CI / on PRs without an interactive session, on your subscription. Same engine via a runtime shim; shim + CLI validated (`node --test`), the live agent path by a live smoke (`npm run smoke`, real SDK). Copy-paste CI configs in [`examples/`](examples). Run it against a deployed preview with `CLAUDE_CODE_OAUTH_TOKEN`.
 - Next — **visual regression** (screenshot diffing); **a11y (axe)** and **perf (Lighthouse)** passes; **Jira / Linear** reporters + SARIF; a `qa-explore init` wizard; inline PR-comment findings.
 

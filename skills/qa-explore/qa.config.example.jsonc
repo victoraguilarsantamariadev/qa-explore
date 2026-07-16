@@ -20,7 +20,7 @@
   // NETWORK CONFINEMENT. The agents may ONLY touch these hosts; any link/redirect/request that would
   // leave them must be refused (they never probe or scan other machines on your network). Omit to
   // auto-derive from baseUrl. Add the tracker host automatically — you don't need to list it here.
-  "allowedHosts": null,                     // e.g. ["192.168.1.164"]; null = just the baseUrl host
+  "allowedHosts": null,                     // e.g. ["staging.example.com"]; null = just the baseUrl host
 
   // What kind of target this is — picks the agent's "hands". "web-spa"/"web-ssr" drive Chromium
   // (deeply supported). "electron" drives the desktop app via Playwright Electron. "api"/"cli" swap
