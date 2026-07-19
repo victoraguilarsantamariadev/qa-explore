@@ -210,6 +210,16 @@
     // "toc": [] // leave empty for call 1 (recon proposes it); paste the APPROVED toc here to skip GATE 1 on refreshes
   },
 
+  // ---- /qa-plan: risk-based test plan (only used by the qa-plan skill) ----
+  // The upfront half: an agent scores impact×likelihood per area; the ENGINE ranks P0/P1/P2 (deterministic)
+  // and writes a test charter that seeds qa-explore areas riskiest-first. Model assesses; rules rank.
+  "plan": {
+    "bands": { "p0": 15, "p1": 8 },           // risk = impact×likelihood (1..25); P0>=15, P1>=8, else P2
+    "outFile": "test-plan.md"
+    // "changed": ["src/checkout/**"],         // what changed this release -> raises likelihood on touched areas
+    // "release": "v1.2.3 / PR#456"
+  },
+
   // ---- /qa-gate: release gate / QA sign-off (only used by the qa-gate skill) ----
   // The decision layer: aggregate the signals qa-explore produced and apply THIS written rubric to emit a
   // DETERMINISTIC GO/NO-GO (rules decide; an agent only writes the sign-off). Wire CI to fail on NO-GO.

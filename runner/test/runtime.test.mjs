@@ -73,9 +73,27 @@ test('all engine files load (parse) on the shim', async () => {
     'qa-heal/engine/qa-heal.workflow.js',
     'qa-manual/engine/qa-manual.workflow.js',
     'qa-gate/engine/qa-gate.workflow.js',
+    'qa-plan/engine/qa-plan.workflow.js',
   ]) {
     assert.equal(typeof loadWorkflow(ENGINE(p)), 'function', 'loads ' + p)
   }
+})
+
+test('qa-plan ranking is deterministic: risk = impact×likelihood → P0/P1/P2, ordered', async () => {
+  const stub = async (_p, opts) => {
+    if (opts && opts.label === 'assess-risk') return { areas: [
+      { key: 'pay', label: 'Payments', mission: 'm', impact: 5, likelihood: 4, rationale: 'r', done: 'd' },   // 20 → P0
+      { key: 'prof', label: 'Profile', mission: 'm', impact: 2, likelihood: 2, rationale: 'r', done: 'd' },   // 4  → P2
+      { key: 'search', label: 'Search', mission: 'm', impact: 3, likelihood: 3, rationale: 'r', done: 'd' },  // 9  → P1
+    ] }
+    return (opts && opts.schema) ? { markdown: '# plan' } : ''
+  }
+  const { result } = await runWorkflow({ scriptPath: ENGINE('qa-plan/engine/qa-plan.workflow.js'), args: { baseUrl: 'http://x.test' }, agent: stub, sink })
+  assert.deepEqual(result.plan.map((a) => a.key), ['pay', 'search', 'prof'])      // ordered by risk desc
+  assert.equal(result.plan[0].risk, 20)
+  assert.deepEqual(result.plan.map((a) => a.priority), ['P0', 'P1', 'P2'])
+  assert.deepEqual(result.counts, { P0: 1, P1: 1, P2: 1 })
+  assert.deepEqual(result.areas.map((a) => a.key), ['pay', 'search', 'prof'])     // seeds qa-explore riskiest-first
 })
 
 test('qa-gate verdict is deterministic: a confirmed major = NO-GO; clean = GO; waived = GO', async () => {

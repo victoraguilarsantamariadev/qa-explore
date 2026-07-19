@@ -26,7 +26,8 @@ export const meta = {
   ],
 }
 
-const cfg = args || {}
+// Accept args as an object (runner / tests) OR a JSON string (some Workflow hosts serialize it).
+const cfg = (typeof args === 'string' && args.trim()) ? JSON.parse(args) : (args || {})
 const gate = cfg.gate || {}
 const results = Array.isArray(cfg.results) ? cfg.results : ((cfg.signals && cfg.signals.results) || [])
 const BLOCK_ON = (gate.blockOn || ['blocker', 'major']).map((s) => String(s).toLowerCase())

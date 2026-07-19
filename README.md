@@ -62,6 +62,32 @@ recon + ORDER features as a real setup sequence → you approve the TOC + audien
 - Two human gates (approve the TOC up front, review the draft before it ships) — never publish auto-docs blind. It won't document a flow with an open bug.
 - The Markdown is the master; it **re-generates when the UI drifts**, so the docs update instead of rotting.
 
+### …plans by risk first — `/qa-plan`
+
+A senior QA team doesn't test everything equally — it tests by **risk**, and it does so **before** burning the expensive explore agents.
+
+```
+recon → per area: IMPACT (blast radius) × LIKELIHOOD (fragility / what changed)
+      → risk = impact×likelihood → rank P0 / P1 / P2 (RULES, not vibes)
+      → acceptance ("done") per area → test-plan.md  [you approve/re-rank]
+      → seeds qa-explore `areas` riskiest-first (P2 tail is what a budget cap drops, on purpose)
+```
+
+**The model assesses impact/likelihood; the RULES rank** — same judgements, same plan. Point `plan.changed` at the release diff and touched areas rise in likelihood: risk-based testing for *this* release, not in the abstract.
+
+### …and signs off the release — `/qa-gate`
+
+The decision a QA lead owns, standardized: **GO / NO-GO**, computed from the evidence the other skills gathered against a **written, versionable rubric**.
+
+```
+signals in → explore findings (severity×confidence, verified?) · Step-0 suite · access-control · a11y
+apply RUBRIC (deterministic) → GO ✅ / NO-GO ❌ + exact blockers + audited waivers → qa-signoff.md
+```
+
+- **Deterministic verdict.** Rules decide (confirmed blocker/major = NO-GO · red Step-0 baseline = NO-GO · any confirmed broken-authorization = NO-GO · a11y critical blocks); an agent only *writes* the sign-off. Same inputs → same verdict, every time — auditable and CI-safe (fail the pipeline on NO-GO).
+- **Waivers are first-class and audited** — an accepted risk leaves the blocker list but is **printed in the sign-off** with who approved it and why. Never silent.
+- **Honest about coverage** — a signal that wasn't collected reads "not assessed", never "clean". On NO-GO, the blockers ARE the fix list for `/qa-fix`.
+
 ## What makes it different from "a bot that clicks"
 
 - **Adversarial verification** — every serious finding is re-run by an independent skeptic before you ever see it.
@@ -79,13 +105,29 @@ recon + ORDER features as a real setup sequence → you approve the TOC + audien
 /plugin install qa-explore@qa-explore
 ```
 
-Then in any project:
+Then in any project, use the commands (each looks for a `qa.config.json`, or helps you create one):
+
+| command | what it does | when |
+|---|---|---|
+| `/qa-plan` | risk-based test plan (impact×likelihood → P0/P1/P2 + charter) | start of a release — decide what to test |
+| `/qa-explore` | the explore→verify→report→codify loop (the core) | find bugs; grow the suite |
+| `/qa-fix` | labelled issue → worktree fix → regression test → verified MR | fix the confirmed bugs |
+| `/qa-heal` | repair stale tests (HOW only), flag real regressions | when the suite goes red |
+| `/qa-manual` | living user/config manual by driving the app | document it / update docs |
+| `/qa-gate` | GO / NO-GO release sign-off against a written rubric | before you ship / as a CI gate |
+
+The typical arc: **`/qa-plan` → `/qa-explore` (→ `/qa-fix`, `/qa-heal`) → `/qa-gate`**, with `/qa-manual` whenever the docs need to catch up.
+
+### Standalone CLI / CI (no interactive session)
+
+The same engines run headless via the runner (Claude Agent SDK) — for CI, PRs, or scripts, on your subscription:
 
 ```
-/qa-explore
+npx qa-explore <plan|explore|report|codify|fix|heal|manual|gate> [--config <path>] [--base <url>] [--dry-run]
+#   manual: [--audience end-user|installer] [--out <file>] [--login-state <state.json>]
 ```
 
-It looks for a `qa.config.json` (or helps you create one), runs the loop, and reports findings grouped by confidence and severity.
+Wire `verdict === 'NO-GO'` from `qa-explore gate` to a failing CI step to block releases. Copy-paste CI configs live in [`examples/`](examples); point it at a deployed preview with `CLAUDE_CODE_OAUTH_TOKEN`.
 
 ## Configure per project
 
@@ -94,7 +136,8 @@ Copy [`skills/qa-explore/qa.config.example.jsonc`](skills/qa-explore/qa.config.e
 | field | meaning |
 |---|---|
 | `baseUrl` + `appPath` | where the app is served |
-| `login` | prose login recipe (or `""` if open) |
+| `login` | how to log in — **4 forms**: prose recipe · `{storageStatePath}` (reuse a saved session) · `{scriptPath}` (login hook) · `{emailSelector,…}` (declarative). Creds always via env `$QA_EMAIL`/`$QA_PASS` |
+| `bootTimeout` / `readySelector` / `warmup` | **app-ready**: ms for a slow first load (default 90000), the selector that means "loaded" (not the spinner), and an optional URL to warm first — so a cold build isn't judged a bug |
 | `e2eDir` / `framework` | where specs live / `playwright` \| `cypress` |
 | `areas` | omit to auto-discover (recon); cached back after first run |
 | `domainNotes` | **known-correct behaviour — the #1 false-positive lever; auto-grows from your triage rejections** |
@@ -106,6 +149,9 @@ Copy [`skills/qa-explore/qa.config.example.jsonc`](skills/qa-explore/qa.config.e
 | `coverage` | `mode`: `sample` (one agent per area, default) or `exhaustive` (inventory every route/entity/variant + a completeness-critic loop) |
 | `tracker` | optional — wire up the issue→fix→MR loop: `type` (`gitlab`/`github`/`none`), `host`, `project`, `tokenEnv` (PAT with `api` scope), `fixLabel`, `defaultBranch`, `attachEvidence` |
 | `fix` | how `/qa-fix` runs: `fixStrategy`, `maxFixes`, `buildTest`, `localRun`, `verify` |
+| `plan` | `/qa-plan` risk bands (`bands.p0`/`p1`), `changed` (release diff → raises likelihood), `outFile` |
+| `gate` | `/qa-gate` rubric: `blockOn`, `requireStep0Green`, `blockOnAccessControl`, `a11yBlockOn`, audited `waive[]`, `outFile` |
+| `manual` | `/qa-manual` `audience` (end-user/installer), `outFile`, `sampleHint`, approved `toc` |
 
 When `tracker.type` is `none` (default), the loop stops at chat triage — no issues are filed. Set it to `gitlab`/`github` and the REPORT step files issues; `/qa-fix` then turns the ones you label into merge requests.
 
@@ -145,6 +191,7 @@ A full exploration is token-heavy. Keep your best model everywhere and control c
 - v0.1 — Claude Code plugin: explore → verify → triage → codify.
 - v0.2 — **the full loop (this):** GitLab/GitHub issue reporter with embedded evidence; `/qa-fix` (labelled issue → isolated-worktree fix → regression test → independent verify → MR); `/qa-heal` (self-healing suite); `/qa-manual` (living user/config documentation from the same drive-your-app engine); multi-viewport (mobile/desktop), multi-**mode** (appStates — re-run in every operational state), multi-role + access-control, an **axe-core a11y** pass, project-type switch (web / electron / API / CLI); safe modes + host confinement.
 - v0.3 — a **standalone runner** (`runner/`, Claude Agent SDK) + **GitHub Action** (`runner@v0`) **and a GitLab CI job** so it runs in CI / on PRs without an interactive session, on your subscription. Same engine via a runtime shim; shim + CLI validated (`node --test`), the live agent path by a live smoke (`npm run smoke`, real SDK). Copy-paste CI configs in [`examples/`](examples). Run it against a deployed preview with `CLAUDE_CODE_OAUTH_TOKEN`.
+- v0.4 — **the QA-process layer:** risk-based `/qa-plan` (impact×likelihood → P0/P1/P2, deterministic ranking) and release-gate `/qa-gate` (deterministic GO/NO-GO sign-off against a written rubric with audited waivers) — the QA-lead bookends around the execution engine. Plus **portability**: pluggable login (prose / saved session / hook / declarative), app-ready (`bootTimeout`/`readySelector`/`warmup`), and a first-class CLI (`npx qa-explore <skill>`).
 - Next — **visual regression** (screenshot diffing); a **perf (Lighthouse)** pass; **Jira / Linear** reporters + SARIF; a `qa-explore init` wizard; inline PR-comment findings.
 
 ## License
