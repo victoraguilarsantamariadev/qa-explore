@@ -20,6 +20,7 @@ const ENGINES = {
   fix: 'qa-fix/engine/qa-fix.workflow.js',
   heal: 'qa-heal/engine/qa-heal.workflow.js',
   manual: 'qa-manual/engine/qa-manual.workflow.js',
+  gate: 'qa-gate/engine/qa-gate.workflow.js',
 }
 
 function parseArgs(argv) {
@@ -37,8 +38,9 @@ async function main() {
   const args = parseArgs(process.argv.slice(2))
   const skill = args._[0]
   if (!skill || !ENGINES[skill]) {
-    console.error('usage: qa-explore <explore|report|codify|fix|heal|manual> [--config <path>] [--base <url>] [--model <id>] [--concurrency N] [--dry-run]')
+    console.error('usage: qa-explore <explore|report|codify|fix|heal|manual|gate> [--config <path>] [--base <url>] [--model <id>] [--concurrency N] [--dry-run]')
     console.error('  manual-only: [--audience end-user|installer] [--out <file>] [--login-state <state.json>]')
+    console.error('  gate: aggregates a prior explore result into a GO/NO-GO sign-off (see qa-gate skill)')
     process.exit(1)
   }
   const scriptPath = resolve(SKILLS, ENGINES[skill])

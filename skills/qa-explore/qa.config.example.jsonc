@@ -208,5 +208,21 @@
     // "product": "My App", "brand": "My Co",
     // "sampleHint": "one clean example (e.g. a fictional client 'Demo SL') reused across every screenshot",
     // "toc": [] // leave empty for call 1 (recon proposes it); paste the APPROVED toc here to skip GATE 1 on refreshes
+  },
+
+  // ---- /qa-gate: release gate / QA sign-off (only used by the qa-gate skill) ----
+  // The decision layer: aggregate the signals qa-explore produced and apply THIS written rubric to emit a
+  // DETERMINISTIC GO/NO-GO (rules decide; an agent only writes the sign-off). Wire CI to fail on NO-GO.
+  "gate": {
+    "blockOn": ["blocker", "major"],          // severities that block a release when CONFIRMED
+    "requireStep0Green": true,                // red baseline suite = NO-GO
+    "blockOnAccessControl": true,             // any confirmed broken-authorization = NO-GO (security)
+    "a11yBlockOn": ["critical"],              // axe impact levels that block
+    // "release": "v1.2.3 / PR#456",          // label for the sign-off
+    "outFile": "qa-signoff.md",
+    "waive": [
+      // Accepted risks are FIRST-CLASS and audited — removed from blockers but PRINTED in the sign-off:
+      // { "match": "flaky upload spinner", "reason": "known 3rd-party lib bug, fix tracked in JIRA-123", "approvedBy": "QA lead" }
+    ]
   }
 }

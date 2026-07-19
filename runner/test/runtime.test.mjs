@@ -72,7 +72,47 @@ test('all engine files load (parse) on the shim', async () => {
     'qa-fix/engine/qa-fix.workflow.js',
     'qa-heal/engine/qa-heal.workflow.js',
     'qa-manual/engine/qa-manual.workflow.js',
+    'qa-gate/engine/qa-gate.workflow.js',
   ]) {
     assert.equal(typeof loadWorkflow(ENGINE(p)), 'function', 'loads ' + p)
   }
+})
+
+test('qa-gate verdict is deterministic: a confirmed major = NO-GO; clean = GO; waived = GO', async () => {
+  const stub = async (_p, opts) => (opts && opts.schema ? { markdown: '# sign-off' } : '')
+  const run = (results, gate) => runWorkflow({ scriptPath: ENGINE('qa-gate/engine/qa-gate.workflow.js'), args: { results, gate }, agent: stub, sink })
+
+  // a confirmed major finding blocks the release
+  const withMajor = [
+    { key: 'step0', step0: { ran: true, failed: 0 } },
+    { area: 'A', key: 'a', explore: { findings: [{ severity: 'major', confidence: 'hard-evidence', title: 'data leak', evidence: 't.zip' }] }, verify: { verdicts: [] } },
+  ]
+  const r1 = (await run(withMajor, {})).result
+  assert.equal(r1.verdict, 'NO-GO')
+  assert.equal(r1.blockers.length, 1)
+  assert.equal(r1.blockers[0].title, 'data leak')
+
+  // only a minor (not in blockOn) → GO
+  const clean = [
+    { key: 'step0', step0: { ran: true, failed: 0 } },
+    { area: 'A', key: 'a', explore: { findings: [{ severity: 'minor', confidence: 'hard-evidence', title: 'typo' }] }, verify: { verdicts: [] } },
+  ]
+  assert.equal((await run(clean, {})).result.verdict, 'GO')
+
+  // a red Step-0 baseline blocks
+  const redSuite = [{ key: 'step0', step0: { ran: true, failed: 3 } }]
+  assert.equal((await run(redSuite, {})).result.verdict, 'NO-GO')
+
+  // the same major, WAIVED with a reason → GO, but recorded as an accepted risk
+  const r4 = (await run(withMajor, { waive: [{ match: 'data leak', reason: 'fp', approvedBy: 'lead' }] })).result
+  assert.equal(r4.verdict, 'GO')
+  assert.equal(r4.waived.length, 1)
+  assert.equal(r4.waived[0].approvedBy, 'lead')
+
+  // an UNCONFIRMED major (no verify verdict, not hard-evidence) does NOT block
+  const unconf = [
+    { key: 'step0', step0: { ran: true, failed: 0 } },
+    { area: 'A', key: 'a', explore: { findings: [{ severity: 'major', confidence: 'judgement', title: 'maybe' }] }, verify: { verdicts: [] } },
+  ]
+  assert.equal((await run(unconf, {})).result.verdict, 'GO')
 })
