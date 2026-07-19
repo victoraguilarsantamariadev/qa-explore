@@ -31,9 +31,19 @@
   // critical/serious violations (deduped, capped). On by default for web targets; set false to skip.
   "a11y": true,
 
-  // Plain-prose login recipe the agents follow (be exact: selectors, the response to wait for,
-  // where the token goes). Point at a project login helper if one exists. Leave "" if the app is open.
-  "login": "Username 'user', password '...'. Fill #user / #pass, click [type=submit], wait for /api/login 200.",
+  // LOGIN — four interchangeable forms (credentials ALWAYS via env $QA_EMAIL / $QA_PASS, never here):
+  //  1) prose recipe (classic, most flexible): a string the agents follow exactly.
+  "login": "Fill #user with $QA_EMAIL and #pass with $QA_PASS, click [type=submit], wait for /api/login 200.",
+  //  2) reuse a saved session (most portable):   "login": { "storageStatePath": "e2e/.auth/state.json" }
+  //     (a bare "…state.json" string is also accepted as shorthand for this.)
+  //  3) declarative selectors:                    "login": { "emailSelector": "#user", "passwordSelector": "#pass", "submitSelector": "[type=submit]", "readySelector": ".app-shell" }
+  //  4) a project login hook that writes a state:  "login": { "scriptPath": "e2e/login.mjs" }
+
+  // APP-READY — so a slow first load (cold build/SSR) is never judged a bug (this bit us for real: a
+  // 90s first dataset build looked like a hang). All optional.
+  "bootTimeout": 90000,                       // ms allowed for the FIRST navigation (default 90000)
+  // "readySelector": ".side-item",           // the app is "loaded" when this is visible (not the spinner)
+  // "warmup": "https://app.example.com/",     // hit once before testing to warm the backend/cache
 
   // Viewports the explore pass sweeps. The FIRST is primary (full pass); each EXTRA re-walks the key
   // screens at that size and runs a MOBILE/RESPONSIVE checklist (no horizontal scroll, hamburger menu
@@ -186,5 +196,17 @@
     "maxHeal": 30,                            // cap failing tests adjudicated per run
     "suiteCommand": ""                        // how to run the suite to collect failures; "" = framework default
                                               //   (playwright: "npx playwright test --reporter=json")
+  },
+
+  // ---- /qa-manual: living user/config manual (only used by the qa-manual skill) ----
+  // The same drive-your-app engine, pointed at docs instead of bugs. Two human gates: approve the TOC
+  // up front, review the draft before it ships. Markdown is the master, so it re-generates on UI drift.
+  "manual": {
+    "audience": "end-user",                   // "end-user" (daily use) or "installer" (config/admin guide)
+    "outFile": "docs/manual.md",              // where the Markdown master is written
+    // "title": "My App — user manual",
+    // "product": "My App", "brand": "My Co",
+    // "sampleHint": "one clean example (e.g. a fictional client 'Demo SL') reused across every screenshot",
+    // "toc": [] // leave empty for call 1 (recon proposes it); paste the APPROVED toc here to skip GATE 1 on refreshes
   }
 }

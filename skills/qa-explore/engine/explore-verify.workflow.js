@@ -99,6 +99,26 @@ function handsBlock(stateFile) {
   ].filter(Boolean).join('\n')
 }
 
+// #3 PLUGGABLE LOGIN — render whatever the config gives us into a recipe the agent can follow:
+// a prose recipe (classic string), a saved session ({storageStatePath}), a login hook
+// ({scriptPath}) or a declarative selector recipe ({emailSelector,...}). Credentials always via env.
+function loginText(login) {
+  if (!login) return '(no login configured — the app may be open, or discover the login flow yourself)'
+  if (typeof login === 'string') return login
+  if (login.storageStatePath) return 'REUSE the saved session at ' + login.storageStatePath + ': create the browser context with { storageState: "' + login.storageStatePath + '" } and SKIP manual login. If it is missing/expired, discover the login flow and re-create the state file.'
+  if (login.scriptPath) return 'Run the project login hook to get a session: `node "' + login.scriptPath + '"` (it should write a Playwright storageState JSON); then create the context from that state file.'
+  if (login.emailSelector) return 'Go to the app, fill "' + login.emailSelector + '" with env $QA_EMAIL and "' + login.passwordSelector + '" with env $QA_PASS, click ' + (login.submitSelector ? '"' + login.submitSelector + '"' : 'the submit button') + ', and wait for the app shell' + (login.readySelector ? ' ("' + login.readySelector + '" visible)' : '') + '. NEVER print the credentials.'
+  return JSON.stringify(login)
+}
+// #4 APP-READY — slow first loads (cold build) must not be judged as bugs. Wait for the ready
+// signal / a generous boot timeout, and optionally warm the backend before testing.
+const BOOT = cfg.bootTimeout || 90000
+function appReadyBlock() {
+  const lines = ['APP READY (do NOT false-negative on a slow first load): allow up to ' + BOOT + ' ms for the FIRST navigation before deciding anything is broken' + (cfg.readySelector ? '; the app is loaded when "' + cfg.readySelector + '" is visible — wait for it, never judge a "loading…" screen as the final state' : '') + '.']
+  if (cfg.warmup) lines.push('WARM-UP first: before testing, request ' + cfg.warmup + ' once to warm the backend/cache so the first real interaction is not the cold one.')
+  return lines.join('\n')
+}
+
 function preamble(extra, role) {
   role = role || PRIMARY
   const stateFile = SHOTS + '/storageState-' + (role.name || 'default') + '.json'
@@ -112,7 +132,9 @@ function preamble(extra, role) {
     (confinementBlock ? '>>> ' + confinementBlock : ''),
     '',
     'LOGIN RECIPE:',
-    (role.login || cfg.login || '(no login configured — the app may be open, or discover the login flow yourself)'),
+    loginText(role.login || cfg.login),
+    '',
+    appReadyBlock(),
     '',
     'KNOWN-CORRECT / INTENTIONAL BEHAVIOUR — do NOT report any of these as bugs (this list grows as the team rejects false positives):',
     (cfg.domainNotes || '(none provided)'),

@@ -3,7 +3,8 @@
 // e.g. in CI / on a PR. Uses the Claude Agent SDK; on a machine logged into Claude Code it runs on
 // your subscription. Usage:
 //   qa-explore <skill> [--config <path>] [--base <url>] [--model <id>] [--concurrency N] [--dry-run]
-//   <skill> = explore | report | codify | fix | heal
+//   <skill> = explore | report | codify | fix | heal | manual
+//   manual-only: [--audience end-user|installer] [--out <file>] [--login-state <state.json>]
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { runWorkflow } from '../src/runtime.mjs'
@@ -18,6 +19,7 @@ const ENGINES = {
   codify: 'qa-explore/engine/codify.workflow.js',
   fix: 'qa-fix/engine/qa-fix.workflow.js',
   heal: 'qa-heal/engine/qa-heal.workflow.js',
+  manual: 'qa-manual/engine/qa-manual.workflow.js',
 }
 
 function parseArgs(argv) {
@@ -35,7 +37,8 @@ async function main() {
   const args = parseArgs(process.argv.slice(2))
   const skill = args._[0]
   if (!skill || !ENGINES[skill]) {
-    console.error('usage: qa-explore <explore|report|codify|fix|heal> [--config <path>] [--base <url>] [--model <id>] [--concurrency N] [--dry-run]')
+    console.error('usage: qa-explore <explore|report|codify|fix|heal|manual> [--config <path>] [--base <url>] [--model <id>] [--concurrency N] [--dry-run]')
+    console.error('  manual-only: [--audience end-user|installer] [--out <file>] [--login-state <state.json>]')
     process.exit(1)
   }
   const scriptPath = resolve(SKILLS, ENGINES[skill])
@@ -43,6 +46,14 @@ async function main() {
   const { path: cfgPath, config } = loadConfig(process.cwd(), args.config && resolve(args.config))
   if (args.base) config.baseUrl = args.base
   if (args.mode) config.mode = args.mode                 // CI safety override (e.g. read-only)
+  if (args['login-state']) config.login = { storageStatePath: resolve(args['login-state']) } // #3: reuse a saved session
+  if (skill === 'manual') {                              // #2: qa-manual knobs from the CLI
+    config.manual = config.manual || {}
+    if (args.audience) config.manual.audience = args.audience
+    if (args.out) config.manual.outFile = resolve(args.out)
+    if (args.title) config.manual.title = args.title
+    if (args.sample) config.manual.sampleHint = args.sample
+  }
   console.error('qa-explore runner · skill=' + skill + ' · config=' + cfgPath + ' · target=' + (config.baseUrl || '(none)') + (args.dryRun ? ' · DRY-RUN' : ''))
 
   let sdkQuery = null
