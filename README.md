@@ -147,7 +147,7 @@ Copy [`skills/qa-explore/qa.config.example.jsonc`](skills/qa-explore/qa.config.e
 | `appStates` | your app's operational **modes** (simulation/demo, a feature flag, offline, dark theme, plan tier, tenant…) — the whole run **re-executes in each**, so you test every mode, not just the active one (findings tagged by mode) |
 | `a11y` | axe-core accessibility pass (WCAG 2 A/AA) — **on by default** for web; set `false` to skip |
 | `coverage` | `mode`: `sample` (one agent per area, default) or `exhaustive` (inventory every route/entity/variant + a completeness-critic loop) |
-| `tracker` | optional — wire up the issue→fix→MR loop: `type` (`gitlab`/`github`/`none`), `host`, `project`, `tokenEnv` (PAT with `api` scope), `fixLabel`, `defaultBranch`, `attachEvidence` |
+| `tracker` | optional — wire up the issue→fix→MR loop: `type` (`gitlab`/`github`/`none`), `host`, `project`, `tokenEnv` (PAT env var — GitHub `repo` scope / GitLab `api` scope; defaults to `GITHUB_TOKEN`/`GITLAB_TOKEN` by type), `fixLabel`, `defaultBranch`, `attachEvidence` |
 | `fix` | how `/qa-fix` runs: `fixStrategy`, `maxFixes`, `buildTest`, `localRun`, `verify` |
 | `plan` | `/qa-plan` risk bands (`bands.p0`/`p1`), `changed` (release diff → raises likelihood), `outFile` |
 | `gate` | `/qa-gate` rubric: `blockOn`, `requireStep0Green`, `blockOnAccessControl`, `a11yBlockOn`, audited `waive[]`, `outFile` |
