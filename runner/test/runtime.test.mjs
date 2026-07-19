@@ -44,8 +44,12 @@ test('runWorkflow loads the REAL explore-verify engine and runs it with a stubbe
   })
   assert.equal(meta.name, 'qa-explore-engine')
   assert.ok(Array.isArray(result))
-  assert.equal(result.length, 1)
-  assert.equal(result[0].key, 'a')
+  // The result always leads with the Step-0 (deterministic suite) entry, then the explored areas
+  // (+ any access-control entries). Assert by KEY, not index, so adding phases doesn't break this.
+  assert.ok(result.find((r) => r.key === 'step0'), 'result includes the Step-0 entry')
+  const areaA = result.find((r) => r.key === 'a')
+  assert.ok(areaA, 'result includes the explored area "a"')
+  assert.equal(areaA.area, 'Area A')
 })
 
 test('runWorkflow loads report-issues and short-circuits when tracker is disabled (no agent call)', async () => {
@@ -59,7 +63,7 @@ test('runWorkflow loads report-issues and short-circuits when tracker is disable
   assert.deepEqual(result.issues, [])
 })
 
-test('all five engine files load (parse) on the shim', async () => {
+test('all engine files load (parse) on the shim', async () => {
   const { loadWorkflow } = await import('../src/runtime.mjs')
   for (const p of [
     'qa-explore/engine/explore-verify.workflow.js',
@@ -67,6 +71,7 @@ test('all five engine files load (parse) on the shim', async () => {
     'qa-explore/engine/codify.workflow.js',
     'qa-fix/engine/qa-fix.workflow.js',
     'qa-heal/engine/qa-heal.workflow.js',
+    'qa-manual/engine/qa-manual.workflow.js',
   ]) {
     assert.equal(typeof loadWorkflow(ENGINE(p)), 'function', 'loads ' + p)
   }
