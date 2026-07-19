@@ -32,7 +32,7 @@ const BASE = (cfg.baseUrl || 'http://localhost') + (cfg.appPath || '/')
 const FW = cfg.framework || 'playwright'
 const E2E = cfg.e2eDir || 'the project E2E directory'
 const TARGET = tracker.defaultBranch || 'develop'
-const TOK = tracker.tokenEnv || 'GITLAB_TOKEN'
+const TOK = tracker.tokenEnv || (tracker.type === 'github' ? 'GITHUB_TOKEN' : 'GITLAB_TOKEN')
 const BUILDTEST = fix.buildTest || cfg.buildTest || ''
 const VERIFY = heal.verify !== false
 const MAXHEAL = heal.maxHeal || 30

@@ -73,7 +73,7 @@ const findingsBlock = findings
     'trace: ' + (f.trace || 'none') + '   har: ' + (f.har || 'none') + '   video: ' + (f.video || 'none'))
   .join('\n')
 
-const TOK = tracker.tokenEnv || 'GITLAB_TOKEN'
+const TOK = tracker.tokenEnv || (tracker.type === 'github' ? 'GITHUB_TOKEN' : 'GITLAB_TOKEN')
 const attach = (tracker.attachEvidence && tracker.attachEvidence.length) ? tracker.attachEvidence : ['screenshot', 'video']
 const maxMb = tracker.maxAttachMb || 10
 const isGitlab = tracker.type === 'gitlab'

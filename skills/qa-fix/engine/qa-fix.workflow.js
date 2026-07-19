@@ -36,7 +36,7 @@ const STRATEGY = fix.fixStrategy || cfg.fixStrategy || tracker.fixStrategy || 'p
 const BUILDTEST = fix.buildTest || cfg.buildTest || ''
 const LOCALRUN = fix.localRun || {}
 const VERIFY = fix.verify !== false   // default ON
-const TOK = tracker.tokenEnv || 'GITLAB_TOKEN'
+const TOK = tracker.tokenEnv || (tracker.type === 'github' ? 'GITHUB_TOKEN' : 'GITLAB_TOKEN')
 
 if (tracker.type !== 'gitlab' && tracker.type !== 'github') {
   log('qa-fix: tracker.type="' + tracker.type + '" no soportado (usa "gitlab" o "github").')
