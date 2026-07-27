@@ -297,8 +297,8 @@ if (!areas) {
   areas = (recon && recon.areas) || []
   inventory = (recon && recon.inventory) || null
 }
-if (areas.length > HARD_CAP) { log('⚠️ qa-explore: ' + areas.length + ' unidades > cap ' + HARD_CAP + ' → recorto ' + (areas.length - HARD_CAP) + ' (sube coverage.maxUnits para cubrirlas todas).'); areas = areas.slice(0, HARD_CAP) }
-log('qa-explore: ' + (EXHAUSTIVE ? 'cobertura EXHAUSTIVA' : 'muestreo') + ' de ' + areas.length + ' unidad(es) → ' + areas.map((a) => a.key).join(', '))
+if (areas.length > HARD_CAP) { log('⚠️ qa-explore: ' + areas.length + ' units > cap ' + HARD_CAP + ' → dropping ' + (areas.length - HARD_CAP) + ' (raise coverage.maxUnits to cover them all).'); areas = areas.slice(0, HARD_CAP) }
+log('qa-explore: ' + (EXHAUSTIVE ? 'EXHAUSTIVE coverage' : 'sampling') + ' of ' + areas.length + ' unit(s) → ' + areas.map((a) => a.key).join(', '))
 
 // ---- Explore + Verify as a reusable pass (initial + completeness rounds) ----
 async function exploreAreas(areaList, state) {
@@ -346,7 +346,7 @@ async function enterState(state) {
   const tSec = Math.round((state.timeoutMs || 180000) / 1000)
   const pSec = Math.round((state.pollMs || 4000) / 1000)
   const transient = JSON.stringify(state.expectTransient || [401, 403, 500, 502, 503, 504])
-  log('qa-explore: preparando estado de app "' + state.name + '"…')
+  log('qa-explore: preparing app state "' + state.name + '"…')
   await agent(
     preamble() +
       '\n\n=== ENTER APP STATE: "' + state.name + '" — DETERMINISTIC SETUP, not exploration ===\n' +
@@ -380,11 +380,11 @@ if (EXHAUSTIVE) {
       { label: 'completeness:' + round, phase: 'Completeness', schema: AREAS_SCHEMA, agentType: 'general-purpose' }
     )
     let gaps = ((critic && critic.areas) || []).filter((a) => !coveredKeys.has(a.key))
-    if (!gaps.length) { log('qa-explore: cobertura completa, sin huecos en la ronda ' + round + '. ✅'); break }
+    if (!gaps.length) { log('qa-explore: coverage complete, no gaps left in round ' + round + '. ✅'); break }
     const room = Math.max(0, HARD_CAP - clean.length)
-    if (gaps.length > room) { log('⚠️ qa-explore: ' + gaps.length + ' huecos pero queda sitio para ' + room + ' (cap ' + HARD_CAP + ') → ' + (gaps.length - room) + ' quedan SIN cubrir.'); gaps = gaps.slice(0, room) }
+    if (gaps.length > room) { log('⚠️ qa-explore: ' + gaps.length + ' gaps but only room for ' + room + ' (cap ' + HARD_CAP + ') → ' + (gaps.length - room) + ' left UNCOVERED.'); gaps = gaps.slice(0, room) }
     if (!gaps.length) break
-    log('qa-explore: ronda ' + round + ' → cubriendo ' + gaps.length + ' hueco(s): ' + gaps.map((g) => g.key).join(', '))
+    log('qa-explore: round ' + round + ' → covering ' + gaps.length + ' gap(s): ' + gaps.map((g) => g.key).join(', '))
     gaps.forEach((g) => coveredKeys.add(g.key))
     clean = clean.concat(await exploreAreas(gaps, PRIMARY_STATE))
     areas = areas.concat(gaps)
@@ -395,7 +395,7 @@ if (EXHAUSTIVE) {
 let authz = []
 if (ROLES.length > 1) {
   phase('Access-control')
-  log('qa-explore: chequeo de control de acceso para ' + (ROLES.length - 1) + ' rol(es) extra → ' + ROLES.slice(1).map((r) => r.name).join(', '))
+  log('qa-explore: access-control check for ' + (ROLES.length - 1) + ' extra role(s) → ' + ROLES.slice(1).map((r) => r.name).join(', '))
   const surface = areas.map((a) => '- ' + a.label + ': ' + a.mission).join('\n')
   const raw = await parallel(ROLES.slice(1).map((role) => () =>
     agent(
@@ -411,7 +411,7 @@ if (ROLES.length > 1) {
 for (const state of APP_STATES) {
   if (state === PRIMARY_STATE) continue
   await enterState(state)
-  log('qa-explore: pasada de estado "' + state.name + '" sobre ' + areas.length + ' área(s)')
+  log('qa-explore: state pass "' + state.name + '" over ' + areas.length + ' area(s)')
   clean = clean.concat(await exploreAreas(areas, state))
 }
 if (MULTI_STATE && PRIMARY_STATE.enter) { await enterState(PRIMARY_STATE) } // leave the app in the resting state
@@ -425,5 +425,5 @@ const step0Entry = {
 const all = [step0Entry, ...clean, ...authz]
 let total = 0, hard = 0
 for (const r of all) for (const f of (r.explore.findings || [])) { total++; if (f.confidence === 'hard-evidence') hard++ }
-log('qa-explore terminado: ' + total + ' hallazgos (' + hard + ' con evidencia dura) en ' + all.length + ' áreas' + (authz.length ? ' (incl. ' + authz.length + ' de control de acceso)' : '') + '.')
+log('qa-explore done: ' + total + ' findings (' + hard + ' with hard evidence) across ' + all.length + ' areas' + (authz.length ? ' (incl. ' + authz.length + ' access-control)' : '') + '.')
 return all

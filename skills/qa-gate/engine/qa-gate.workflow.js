@@ -100,7 +100,7 @@ const coverage = {
   visual: cfg.visual ? 'assessed' : 'not assessed',
   perf: cfg.perf ? 'assessed' : 'not assessed',
 }
-log('qa-gate: veredicto ' + verdict + ' · ' + blockers.length + ' bloqueante(s) · ' + accepted.length + ' riesgo(s) aceptado(s) · ' + allFindings.length + ' hallazgo(s) totales')
+log('qa-gate: verdict ' + verdict + ' · ' + blockers.length + ' blocker(s) · ' + accepted.length + ' accepted risk(s) · ' + allFindings.length + ' findings total')
 
 // -------------------------------------------------------------- SIGN-OFF (narrated, NOT decided, by an agent)
 phase('Sign-off')

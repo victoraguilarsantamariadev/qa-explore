@@ -50,7 +50,7 @@ const RESULT_SCHEMA = {
 }
 
 if (findings.length === 0) {
-  log('qa-report: no hay hallazgos confirmados que archivar.')
+  log('qa-report: no confirmed findings to file.')
   return { issues: [], summary: 'nothing to file' }
 }
 if (tracker.type !== 'gitlab' && tracker.type !== 'github') {

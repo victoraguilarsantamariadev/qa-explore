@@ -55,7 +55,7 @@ const RESULT_SCHEMA = {
 
 const bugs = (cfg.bugs || [])
 const smokes = (cfg.smokes || [])
-log('qa-codify: ' + bugs.length + ' tests de regresión (rojos) + ' + smokes.length + ' smoke (verdes) → ' + E2E)
+log('qa-codify: ' + bugs.length + ' regression tests (red) + ' + smokes.length + ' smoke (green) → ' + E2E)
 
 const bugSpecs = await parallel(bugs.map((b) => () =>
   agent(
@@ -78,5 +78,5 @@ const smokeSpecs = await parallel(smokes.map((s) => () =>
 
 const all = [...bugSpecs, ...smokeSpecs].filter(Boolean)
 const ok = all.filter((r) => r.observedStatus === 'fails-as-expected' || r.observedStatus === 'passes-as-expected').length
-log('qa-codify terminado: ' + ok + '/' + all.length + ' specs validados como esperado.')
+log('qa-codify done: ' + ok + '/' + all.length + ' specs self-validated as expected.')
 return all

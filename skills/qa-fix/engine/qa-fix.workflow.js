@@ -263,5 +263,5 @@ const skipped = clean.filter((f) => f.status === 'skipped-unfixable').length
 const failed = clean.filter((f) => f.status === 'failed').length
 const verified = clean.filter((f) => f.verdict && f.verdict.verdict === 'fix-verified').length
 const doubt = clean.filter((f) => f.verdict && f.verdict.verdict && f.verdict.verdict !== 'fix-verified').length
-log('qa-fix terminado: ' + opened + ' MR abiertas (' + verified + ' verificadas, ' + doubt + ' con dudas), ' + skipped + ' saltadas, ' + failed + ' fallidas.')
+log('qa-fix done: ' + opened + ' MRs opened (' + verified + ' verified, ' + doubt + ' with doubts), ' + skipped + ' skipped, ' + failed + ' failed.')
 return { fixes: clean, summary: opened + ' MR opened (' + verified + ' verified / ' + doubt + ' doubt) / ' + skipped + ' skipped / ' + failed + ' failed' }

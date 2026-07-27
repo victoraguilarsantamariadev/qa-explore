@@ -87,7 +87,7 @@ const ranked = ((assessed && assessed.areas) || [])
   })
   .sort((x, y) => y.risk - x.risk)
 const counts = ranked.reduce((m, a) => { m[a.priority] = (m[a.priority] || 0) + 1; return m }, { P0: 0, P1: 0, P2: 0 })
-log('qa-plan: ' + ranked.length + ' área(s) evaluada(s) → P0:' + counts.P0 + ' P1:' + counts.P1 + ' P2:' + counts.P2)
+log('qa-plan: ' + ranked.length + ' area(s) assessed → P0:' + counts.P0 + ' P1:' + counts.P1 + ' P2:' + counts.P2)
 
 // -------------------------------------------------------------- CHARTER (agent writes the plan document)
 phase('Charter')

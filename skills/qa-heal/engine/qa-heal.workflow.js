@@ -82,10 +82,10 @@ if (!failures) {
 }
 if (failures.length > MAXHEAL) failures = failures.slice(0, MAXHEAL)
 if (failures.length === 0) {
-  log('qa-heal: la suite está verde — nada que sanar. 🎉')
+  log('qa-heal: the suite is green — nothing to heal. 🎉')
   return { healed: [], regressions: [], mrUrl: null, summary: 'suite green' }
 }
-log('qa-heal: ' + failures.length + ' test(s) en rojo → adjudicar (selector caducado vs regresión real).')
+log('qa-heal: ' + failures.length + ' test(s) red → adjudicating (stale selector vs real regression).')
 
 // ---------- Phase 2: adjudicate + heal (one worktree agent, one MR for all repairs) ----------
 const TEST_VERDICT = {
@@ -153,8 +153,8 @@ const healed = verdicts.filter((v) => v.verdict === 'healed' || v.verdict === 'f
 const regressions = verdicts.filter((v) => v.verdict === 'real-regression')
 const flagged = verdicts.filter((v) => v.assertionTouched)   // red flags — a heal that touched an assertion
 const mrUrl = healResult && healResult.mrUrl
-log('qa-heal: ' + healed.length + ' reparado(s), ' + regressions.length + ' regresión(es) real(es) → a issue, ' + verdicts.filter((v) => v.verdict === 'could-not-heal').length + ' sin resolver.')
-if (flagged.length) log('⚠️ qa-heal: ' + flagged.length + ' reparación(es) tocaron una ASERCIÓN — revísalas a mano, podrían ocultar un bug.')
+log('qa-heal: ' + healed.length + ' repaired, ' + regressions.length + ' real regression(s) → filed as issues, ' + verdicts.filter((v) => v.verdict === 'could-not-heal').length + ' unresolved.')
+if (flagged.length) log('⚠️ qa-heal: ' + flagged.length + ' repair(s) touched an ASSERTION — review by hand, they may be hiding a bug.')
 
 // ---------- Phase 3: independent verify — the diff must be HOW-only ----------
 let verify = null
@@ -181,7 +181,7 @@ if (VERIFY && mrUrl && healed.length) {
     ].join('\n'),
     { label: 'verify-heal', phase: 'Verify-heal', schema: VERIFY_SCHEMA, agentType: 'general-purpose', isolation: 'worktree' }
   )
-  if (verify && verify.assertionsIntact === false) log('⚠️ qa-heal: el verificador detectó aserciones alteradas — NO mergear sin revisar: ' + (verify.suspect || []).join(', '))
+  if (verify && verify.assertionsIntact === false) log('⚠️ qa-heal: the verifier found altered assertions — do NOT merge without review: ' + (verify.suspect || []).join(', '))
 }
 
 return {
