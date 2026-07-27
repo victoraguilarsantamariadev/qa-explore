@@ -2,7 +2,7 @@
 
 Run the qa-explore engines **headless** — no interactive Claude Code session — so they work in CI / on a PR. It runs the *exact same* `skills/*/engine/*.workflow.js` files the Claude Code plugin uses, via a thin runtime shim over the [Claude Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk). One engine, two runtimes.
 
-> Status: **v0.3 (dev)**. The runtime shim, CLI and `--dry-run` are validated by `node --test`; the live agent path (real Agent SDK, text + structured) by `npm run smoke`. See Auth.
+> Status: **v0.4.0**. The runtime shim, CLI, config normalisation and `--dry-run` are validated by `node --test`; the live agent path (real Agent SDK, text + structured) by `npm run smoke`. The full explore→verify loop has been run end-to-end against a live target. See Auth.
 
 ## Install & run locally
 
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: victoraguilarsantamariadev/qa-explore/runner@v0     # this composite action
+      - uses: victoraguilarsantamariadev/qa-explore/runner@v0.4.0     # this composite action
         with:
           base-url: https://staging.example.com        # your deployed pre-prod / preview URL
           mode: read-only                               # SAFE default in CI — never writes to the target
@@ -51,7 +51,7 @@ The action installs the runner + Chromium, runs the skill, and uploads `qa-explo
 Uploading a report doesn't block anything. To make the gate a real gate, run `skill: gate` — the action reads the verdict and **exits non-zero on NO-GO**, after the evidence upload:
 
 ```yaml
-      - uses: victoraguilarsantamariadev/qa-explore/runner@v0
+      - uses: victoraguilarsantamariadev/qa-explore/runner@v0.4.0
         with:
           skill: gate
           base-url: https://staging.example.com
@@ -66,7 +66,7 @@ Uploading a report doesn't block anything. To make the gate a real gate, run `sk
 
 Put your deploy job behind `needs: gate`. Both checks run *after* the artifact upload, so a blocked release still ships its evidence.
 
-Pinned to the `v0` tag. Ready-to-copy workflows live in [`examples/`](../examples): `github-actions.yml` and **`gitlab-ci.yml`** (GitLab has no marketplace action — the job clones this repo and runs the runner directly, using a `CLAUDE_CODE_OAUTH_TOKEN` CI/CD variable).
+Pin to an exact tag (`@v0.4.0`), not to a branch: this action receives your Claude credential as an input, so a mutable ref would hand every future commit access to that secret in your CI. Ready-to-copy workflows live in [`examples/`](../examples): `github-actions.yml` and **`gitlab-ci.yml`** (GitLab has no marketplace action — the job clones this repo and runs the runner directly, using a `CLAUDE_CODE_OAUTH_TOKEN` CI/CD variable).
 
 ## GitLab CI
 

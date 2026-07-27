@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: victoraguilarsantamariadev/qa-explore/runner@v0
+      - uses: victoraguilarsantamariadev/qa-explore/runner@v0.4.0
         with:
           base-url: ${{ inputs.base-url }}
           mode: ${{ inputs.mode }}
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: victoraguilarsantamariadev/qa-explore/runner@v0
+      - uses: victoraguilarsantamariadev/qa-explore/runner@v0.4.0
         with:
           skill: gate
           base-url: ${{ inputs.base-url }}
