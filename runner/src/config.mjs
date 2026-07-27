@@ -1,6 +1,6 @@
 // Minimal JSONC reader (string-aware comment + trailing-comma stripper) for qa.config.json[c].
 import { readFileSync, existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { resolve, isAbsolute } from 'node:path'
 
 export function stripJsonc(s) {
   // A UTF-8 BOM is what an editor on Windows leaves behind; JSON.parse chokes on it.
@@ -22,11 +22,15 @@ export function stripJsonc(s) {
 // - login (#3): accept a bare storageState path string ("…state.json") as shorthand for { storageStatePath }.
 //   A prose recipe string (the classic form) is left untouched; an object is passed through.
 // - manual (#2): qa-manual reads its knobs from here.
-export function normalizeConfig(config = {}) {
+export function normalizeConfig(config = {}, cwd = process.cwd()) {
   const c = { ...config }
   if (c.bootTimeout == null) c.bootTimeout = 90000
   if (typeof c.login === 'string' && /\.json\s*$/.test(c.login)) c.login = { storageStatePath: c.login.trim() }
   if (c.manual == null) c.manual = {}
+  // shotsDir (#7): the explore agents cd into e2eDir before driving the browser, so a RELATIVE
+  // path would resolve from THERE — evidence lands in e2eDir/<shotsDir> and falls outside the
+  // CI artifact glob, which silently collects nothing. Anchor it to the project root instead.
+  if (typeof c.shotsDir === 'string' && c.shotsDir && !isAbsolute(c.shotsDir)) c.shotsDir = resolve(cwd, c.shotsDir)
   return c
 }
 
@@ -35,7 +39,7 @@ export function loadConfig(cwd = process.cwd(), explicitPath) {
     ? [explicitPath]
     : ['qa.config.json', 'qa.config.jsonc', 'test/E2E/qa.config.json', 'e2e/qa.config.json'].map((p) => resolve(cwd, p))
   for (const p of candidates) {
-    if (existsSync(p)) return { path: p, config: normalizeConfig(JSON.parse(stripJsonc(readFileSync(p, 'utf8')))) }
+    if (existsSync(p)) return { path: p, config: normalizeConfig(JSON.parse(stripJsonc(readFileSync(p, 'utf8'))), cwd) }
   }
   throw new Error('qa.config.json not found (looked in: ' + candidates.join(', ') + ')')
 }

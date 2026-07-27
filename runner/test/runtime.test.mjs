@@ -46,6 +46,19 @@ test('normalizeConfig fills portability defaults and accepts a bare storageState
   assert.equal(normalizeConfig({ login: 'log in as admin' }).login, 'log in as admin')
 })
 
+test('normalizeConfig anchors a relative shotsDir to the project root, not to e2eDir', async () => {
+  const root = process.platform === 'win32' ? 'C:\\builds\\app' : '/builds/app'
+  // The explore agents cd into e2eDir, so a relative path resolving from there would drop the
+  // evidence outside the CI artifact glob.
+  assert.equal(normalizeConfig({ shotsDir: 'qa-evidence' }, root).shotsDir, resolve(root, 'qa-evidence'))
+  assert.equal(normalizeConfig({ shotsDir: './evidence' }, root).shotsDir, resolve(root, 'evidence'))
+  // An absolute path is left exactly as the user wrote it.
+  const abs = process.platform === 'win32' ? 'C:\\tmp\\qa-explore' : '/tmp/qa-explore'
+  assert.equal(normalizeConfig({ shotsDir: abs }, root).shotsDir, abs)
+  // Unset stays unset — the engines apply their own default.
+  assert.equal(normalizeConfig({}, root).shotsDir, undefined)
+})
+
 test('runWorkflow loads the REAL explore-verify engine and runs it with a stubbed agent', async () => {
   // stub: explore call returns a findings object; recon is skipped because we supply areas.
   const stub = async (_prompt, opts) => (opts && opts.schema

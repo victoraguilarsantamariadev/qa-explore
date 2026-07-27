@@ -7,7 +7,11 @@
 //   tracker: { type, host, project, tokenEnv, issueLabels, fixLabel, assignees },  // resolved qa.config.tracker
 //   findings: [ {                                  // the set the skill chose to file (already de-noised)
 //     area, severity, confidence, title, whatHappened, expected, repro,
-//     evidence, screenshot, trace, har, video
+//     evidence, screenshot, trace, har, video,
+//     verified,                                    // true | false | undefined — set it from the Verify
+//                                                  // verdicts. Only blocker/major are re-run, so a
+//                                                  // filed hard-evidence minor (every a11y hit) is
+//                                                  // undefined and the issue says "not assessed".
 //   } ],
 //   shotsDir,                                      // evidence root (for attaching the primary screenshot)
 //   baseUrl,                                        // app URL, for context in the issue body
@@ -64,6 +68,12 @@ const findingsBlock = findings
     '--- FINDING ' + (i + 1) + ' ---\n' +
     'area: ' + (f.area || '?') + '\n' +
     'severity: ' + (f.severity || '?') + '   confidence: ' + (f.confidence || '?') + '\n' +
+    // Only blocker/major go through the Verify pass, but the filing policy also files any
+    // hard-evidence finding — including every a11y hit, which is minor by construction. Say so
+    // per issue: an unverified finding must never read as if a skeptic had confirmed it.
+    'verified: ' + (f.verified === true ? 'yes — independently reproduced by a skeptic agent'
+      : f.verified === false ? 'NO — the skeptic could not reproduce it'
+      : 'not assessed — below the verify threshold (only blocker/major are re-run); treat as a single-agent observation') + '\n' +
     'title: ' + (f.title || '(untitled)') + '\n' +
     'whatHappened: ' + (f.whatHappened || '') + '\n' +
     'expected: ' + (f.expected || '(infer the correct behaviour)') + '\n' +

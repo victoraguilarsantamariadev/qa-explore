@@ -90,7 +90,7 @@ apply RUBRIC (deterministic) → GO ✅ / NO-GO ❌ + exact blockers + audited w
 
 ## What makes it different from "a bot that clicks"
 
-- **Adversarial verification** — every serious finding is re-run by an independent skeptic before you ever see it.
+- **Adversarial verification** — every **blocker/major** finding is re-run by an independent skeptic before you ever see it, and the skeptic can also *downgrade* a severity it thinks was overstated. Minor findings (including every a11y hit) are below that threshold: they still get filed when the evidence is hard, but each one says **"verified: not assessed"** so a single-agent observation never reads as a confirmed one.
 - **Auto-learning** — when you reject a finding as not-a-bug, the reason is appended to the project's `domainNotes`, so the same false positive is never raised again. The harness gets smarter per project.
 - **Real evidence** — Playwright trace.zip, network HAR, console log and video per finding. Reproducing is one click in the trace viewer.
 - **One run, many passes** — a single explore fans out across your app's **modes × viewports × roles**: it re-runs the whole sweep in **every operational mode** you declare (simulation/demo, a feature flag, offline, a theme, a plan tier, a tenant — findings tagged by mode), re-walks key screens at **every viewport** with a mobile/responsive checklist, and (per extra role) hunts **broken access control**.
