@@ -146,7 +146,8 @@
     "issueLabels": ["qa-explore"],             // labels stamped on every auto-filed issue (used for dedup too)
     "fixLabel": "qa::confirmed",               // the label a HUMAN adds to greenlight auto-fixing — this is the gate
     "fixingLabel": "qa::fixing",               // qa-fix stamps this while working, so an issue is not picked up twice
-    "defaultBranch": "develop",                // target branch for the merge requests qa-fix opens
+    "defaultBranch": "main",                   // target branch for the MRs qa-fix/qa-heal open. If you omit it,
+                                               // they default to "main" and confirm the repo's real default via the API.
     "assignees": [],                           // optional usernames to assign filed issues / opened MRs to
 
     // Which findings get an issue. Default: real problems only (not every cosmetic nitpick).

@@ -31,7 +31,11 @@ const heal = cfg.heal || {}
 const BASE = (cfg.baseUrl || 'http://localhost') + (cfg.appPath || '/')
 const FW = cfg.framework || 'playwright'
 const E2E = cfg.e2eDir || 'the project E2E directory'
-const TARGET = tracker.defaultBranch || 'develop'
+// See qa-fix: "develop" is a gitflow convention, not a safe default. Fall back to "main" and have
+// the agent confirm the repository's real default branch before opening anything.
+const TARGET = tracker.defaultBranch || 'main'
+const TARGET_NOTE = tracker.defaultBranch ? ''
+  : ' NOTE: tracker.defaultBranch is not configured, so "' + TARGET + '" is only a guess — read the repository\'s real `default_branch` from the API and use THAT if it differs.'
 const TOK = tracker.tokenEnv || (tracker.type === 'github' ? 'GITHUB_TOKEN' : 'GITLAB_TOKEN')
 const BUILDTEST = fix.buildTest || cfg.buildTest || ''
 const VERIFY = heal.verify !== false
@@ -135,7 +139,7 @@ const healResult = await agent(
     '  d. If it passes on re-run (flaky) → stabilize with a proper wait/condition (no assertion change). verdict "flaky-stabilized".',
     '  e. If you genuinely cannot tell or repair safely → verdict "could-not-heal" with notes.',
     '',
-    'AFTER adjudicating all: if you repaired ANY test, put all repairs on ONE branch "qa-heal/' + failures.length + 'tests-<short-slug>" off ' + TARGET + ', commit (message: "qa-heal: repair stale tests"), ' +
+    'AFTER adjudicating all: if you repaired ANY test, put all repairs on ONE branch "qa-heal/' + failures.length + 'tests-<short-slug>" off ' + TARGET + ',' + TARGET_NOTE + ' commit (message: "qa-heal: repair stale tests"), ' +
       (hasTracker
         ? 'push it and open ONE merge request targeting "' + TARGET + '" that lists each repaired test and EXACTLY what HOW-level change you made (so a reviewer can confirm no assertion moved). ' + (isGitlab ? 'POST <base>/api/v4/projects/<ENC>/merge_requests.' : 'gh pr create --base ' + TARGET + '.')
         : 'leave it as a local branch and report its name + the diff.') +

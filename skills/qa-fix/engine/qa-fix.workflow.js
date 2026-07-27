@@ -30,7 +30,12 @@ const fix = cfg.fix || {}
 const BASE = (cfg.baseUrl || 'http://localhost') + (cfg.appPath || '/')
 const FW = cfg.framework || 'playwright'
 const E2E = cfg.e2eDir || 'the project E2E directory'
-const TARGET = tracker.defaultBranch || 'develop'
+// GitHub and GitLab both initialise new repos to "main"; "develop" is a gitflow convention most
+// projects do not follow. Guessing it wrong means opening the MR against a branch that does not
+// exist, so when it is unset we take "main" AND make the agent confirm it against the API.
+const TARGET = tracker.defaultBranch || 'main'
+const TARGET_NOTE = tracker.defaultBranch ? ''
+  : ' NOTE: tracker.defaultBranch is not configured, so "' + TARGET + '" is only a guess — FIRST read the repository\'s real default branch from the API (the `default_branch` field) and branch off / target THAT if it differs. Never open a merge request against a branch that does not exist.'
 const MAX = fix.maxFixes || cfg.maxFixes || tracker.maxFixes || 5
 const STRATEGY = fix.fixStrategy || cfg.fixStrategy || tracker.fixStrategy || 'per-issue'   // "per-issue" (atomic MR each) | "batched" (one MR per run)
 const BUILDTEST = fix.buildTest || cfg.buildTest || ''
@@ -142,7 +147,7 @@ function fixerPrompt(issue) {
     '3. WRITE A REGRESSION TEST that asserts the EXPECTED/correct behaviour and RUNS AGAINST THE CHANGED CODE per the rule above (code-level test preferred; E2E only against a local build of the worktree). Put it in ' + E2E + ' or the matching unit/integration test location, matching the neighbouring tests\' style. Confirm it is RED right now (before your fix) and fails for the RIGHT reason (the assertion), not a broken selector/login/setup.',
     '4. FIX THE CODE (smallest correct change; follow the repo conventions and any CLAUDE.md). Re-run the regression test against the changed code until it is GREEN.',
     '5. GUARD AGAINST REGRESSIONS: run the broader checks so you do not break anything' + (BUILDTEST ? ' (project check: `' + BUILDTEST + '`)' : '') + ' and, if an E2E suite exists in ' + E2E + ', run it (against the local build, not ' + BASE + '). Report the result. If your change breaks something else, fix that too or scope down.',
-    '6. OPEN THE MR: create a branch "qa-fix/' + issue.iid + '-<short-slug>" off ' + TARGET + ', commit (fix + the new test) with a message referencing the issue, push the branch, and open a merge request targeting "' + TARGET + '". ' +
+    '6. OPEN THE MR: create a branch "qa-fix/' + issue.iid + '-<short-slug>" off ' + TARGET + ', commit (fix + the new test) with a message referencing the issue, push the branch, and open a merge request targeting "' + TARGET + '".' + TARGET_NOTE + ' ' +
       (isGitlab
         ? 'POST <base>/api/v4/projects/<ENC>/merge_requests with source_branch, target_branch="' + TARGET + '", title="Fix #' + issue.iid + ': ...", description including "Closes #' + issue.iid + '" and what you changed' + (tracker.assignees && tracker.assignees.length ? ', and assign the reviewers' : '') + ', remove_source_branch=true.'
         : 'Use: git push -u origin <branch>; then gh pr create --base ' + TARGET + ' --title "Fix #' + issue.iid + ': ..." --body "Closes #' + issue.iid + ' ...".') +
@@ -164,7 +169,7 @@ function batchedPrompt(list) {
     '',
     changedCodeRule,
     '',
-    'Work on ONE branch "qa-fix/batch-' + list.length + 'fixes-<short-slug>" off ' + TARGET + '. For EACH issue below, in order: claim it (add "' + (tracker.fixingLabel || 'qa::fixing') + '" + a comment), understand it, write a RED regression test asserting the correct behaviour AND running against the changed code (per the rule above), fix the code until it is GREEN. Keep unrelated issues independent in separate commits so a reviewer can follow them.',
+    'Work on ONE branch "qa-fix/batch-' + list.length + 'fixes-<short-slug>" off ' + TARGET + '.' + TARGET_NOTE + ' For EACH issue below, in order: claim it (add "' + (tracker.fixingLabel || 'qa::fixing') + '" + a comment), understand it, write a RED regression test asserting the correct behaviour AND running against the changed code (per the rule above), fix the code until it is GREEN. Keep unrelated issues independent in separate commits so a reviewer can follow them.',
     'After all are done, run the broader checks once' + (BUILDTEST ? ' (`' + BUILDTEST + '`)' : '') + ' + the E2E suite if present (against a local build, not ' + BASE + '); everything must be green. Then push the branch and open ONE merge request targeting "' + TARGET + '" whose description lists each fix and includes a "Closes #<iid>" line for EVERY issue. Comment the MR link on each issue and drop the "' + (tracker.fixingLabel || 'qa::fixing') + '" label from each.',
     'If a specific issue is NOT safely fixable, skip just that one (comment why on it, drop its fixing label, exclude it from the MR) and keep going with the rest. A weak/speculative fix is worse than none, and never weaken a test to force green.',
     '',
