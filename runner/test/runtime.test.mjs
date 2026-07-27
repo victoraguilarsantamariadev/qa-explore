@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
+import { readFileSync, existsSync } from 'node:fs'
 import { pipeline, parallel, runWorkflow } from '../src/runtime.mjs'
 import { stripJsonc, normalizeConfig } from '../src/config.mjs'
 
@@ -89,6 +90,26 @@ test('runWorkflow loads report-issues and short-circuits when tracker is disable
     sink,
   })
   assert.deepEqual(result.issues, [])
+})
+
+test('the publishable package ships the engines the CLI resolves', async () => {
+  // Publishing runner/ on its own shipped 9 files and NO skills/, so every skill died with
+  // ENOENT on node_modules/skills/... The package must be rooted at the repo, where the CLI's
+  // ../../skills resolves inside the package.
+  const root = resolve(HERE, '..', '..')
+  const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
+  assert.equal(pkg.name, 'qa-explore', 'the published name is what `npx qa-explore` needs')
+  assert.ok(!pkg.private, 'a private package cannot be published')
+  assert.ok(pkg.files.includes('skills'), 'skills/ must ship or every engine 404s at runtime')
+  assert.ok(pkg.files.some((f) => f.startsWith('runner/bin')), 'the CLI entrypoint must ship')
+  assert.equal(pkg.bin['qa-explore'], 'runner/bin/qa-explore.mjs')
+  // Every engine the CLI can dispatch to must exist relative to the package root.
+  const cli = readFileSync(resolve(root, 'runner', 'bin', 'qa-explore.mjs'), 'utf8')
+  const engines = [...cli.matchAll(/^\s+\w+: '([^']+\.workflow\.js)',$/gm)].map((m) => m[1])
+  assert.ok(engines.length >= 8, 'expected the full skill set, got ' + engines.length)
+  for (const e of engines) {
+    assert.ok(existsSync(resolve(root, 'skills', e)), 'missing engine: skills/' + e)
+  }
 })
 
 test('all engine files load (parse) on the shim', async () => {

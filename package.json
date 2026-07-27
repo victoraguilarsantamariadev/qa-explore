@@ -1,0 +1,32 @@
+{
+  "name": "qa-explore",
+  "version": "0.4.0",
+  "description": "A team of AI agents that test your web app like a human QA team, then codify what they find into a self-growing Playwright/Cypress suite. Runs headless in CI via the Claude Agent SDK, or as a Claude Code plugin.",
+  "keywords": ["testing", "e2e", "qa", "playwright", "cypress", "agents", "exploratory-testing", "regression", "accessibility", "claude"],
+  "license": "MIT",
+  "author": "Víctor",
+  "homepage": "https://github.com/victoraguilarsantamariadev/qa-explore#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/victoraguilarsantamariadev/qa-explore.git" },
+  "bugs": { "url": "https://github.com/victoraguilarsantamariadev/qa-explore/issues" },
+  "type": "module",
+  "bin": { "qa-explore": "runner/bin/qa-explore.mjs" },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.0"
+  },
+  "scripts": {
+    "test": "cd runner && node --test",
+    "smoke": "node runner/scripts/live-smoke.mjs"
+  },
+  "//": "Published from the REPO ROOT, not from runner/. The CLI resolves its engines at ../../skills relative to runner/bin, which is repo/skills in a checkout and <pkg>/skills once installed — the same expression either way. Publishing runner/ on its own shipped 9 files and no engines, so every skill died with ENOENT on node_modules/skills.",
+  "files": [
+    "runner/bin",
+    "runner/src",
+    "runner/action.yml",
+    "skills",
+    "commands",
+    ".claude-plugin",
+    "README.md",
+    "LICENSE"
+  ]
+}
