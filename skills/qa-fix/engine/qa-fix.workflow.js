@@ -39,7 +39,7 @@ const VERIFY = fix.verify !== false   // default ON
 const TOK = tracker.tokenEnv || (tracker.type === 'github' ? 'GITHUB_TOKEN' : 'GITLAB_TOKEN')
 
 if (tracker.type !== 'gitlab' && tracker.type !== 'github') {
-  log('qa-fix: tracker.type="' + tracker.type + '" no soportado (usa "gitlab" o "github").')
+  log('qa-fix: tracker.type="' + tracker.type + '" is not supported — set it to "gitlab" or "github".')
   return { fixes: [], summary: 'tracker disabled/unsupported' }
 }
 const isGitlab = tracker.type === 'gitlab'
@@ -118,7 +118,7 @@ if (issues.length === 0) {
   log('qa-fix: no issues labelled "' + (tracker.fixLabel || 'qa::confirmed') + '" are waiting to be fixed.')
   return { fixes: [], summary: 'no approved issues to fix' }
 }
-log('qa-fix: ' + issues.length + ' issue(s) aprobada(s) → un agente por issue (worktree aislado): ' + issues.map((i) => '#' + i.iid).join(', '))
+log('qa-fix: ' + issues.length + ' approved issue(s) → one agent each, in an isolated worktree: ' + issues.map((i) => '#' + i.iid).join(', '))
 
 // ---------- Phase 2: one fixer per issue, isolated worktree ----------
 function fixerPrompt(issue) {
