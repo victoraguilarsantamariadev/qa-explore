@@ -3,13 +3,15 @@
 // e.g. in CI / on a PR. Uses the Claude Agent SDK; on a machine logged into Claude Code it runs on
 // your subscription. Usage:
 //   qa-explore <skill> [--config <path>] [--base <url>] [--model <id>] [--concurrency N] [--dry-run]
-//   <skill> = explore | report | codify | fix | heal | manual
+//   <skill> = plan | explore | report | codify | fix | heal | manual | gate
+//   codify/report: [--from <explore-result.json>] [--max-smokes N]
 //   manual-only: [--audience end-user|installer] [--out <file>] [--login-state <state.json>]
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { runWorkflow } from '../src/runtime.mjs'
 import { makeAgent } from '../src/agent.mjs'
 import { loadConfig } from '../src/config.mjs'
+import { fromExploreResultFile } from '../src/findings.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SKILLS = resolve(HERE, '..', '..', 'skills')   // runner/ sits next to skills/ in the repo
@@ -40,6 +42,7 @@ async function main() {
   const skill = args._[0]
   if (!skill || !ENGINES[skill]) {
     console.error('usage: qa-explore <plan|explore|report|codify|fix|heal|manual|gate> [--config <path>] [--base <url>] [--model <id>] [--concurrency N] [--dry-run]')
+    console.error('  codify/report: [--from <explore-result.json>]  carry over the skeptic-CONFIRMED findings of a previous run')
     console.error('  manual-only: [--audience end-user|installer] [--out <file>] [--login-state <state.json>]')
     console.error('  gate: aggregates a prior explore result into a GO/NO-GO sign-off (see qa-gate skill)')
     process.exit(1)
@@ -56,6 +59,18 @@ async function main() {
     if (args.out) config.manual.outFile = resolve(args.out)
     if (args.title) config.manual.title = args.title
     if (args.sample) config.manual.sampleHint = args.sample
+  }
+  // codify/report take their findings as ARGS, not from the config — so without this the CLI
+  // had no way to hand them a previous run's result and both were a silent no-op.
+  if (args.from && (skill === 'codify' || skill === 'report')) {
+    const picked = fromExploreResultFile(resolve(args.from), { skill, maxSmokes: args['max-smokes'] })
+    Object.assign(config, picked.args)
+    console.error('  --from ' + args.from + ': ' + picked.summary)
+  } else if ((skill === 'codify' || skill === 'report') && !args.dryRun) {
+    const have = skill === 'codify'
+      ? ((config.bugs || []).length + (config.smokes || []).length)
+      : (config.findings || []).length
+    if (!have) console.error('  note: no findings supplied — pass --from <explore-result.json>, or put them in the config. Nothing to do.')
   }
   console.error('qa-explore runner · skill=' + skill + ' · config=' + cfgPath + ' · target=' + (config.baseUrl || '(none)') + (args.dryRun ? ' · DRY-RUN' : ''))
 

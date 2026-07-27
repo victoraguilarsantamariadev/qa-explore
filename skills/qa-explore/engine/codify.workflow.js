@@ -24,9 +24,14 @@ function writerPreamble(kind) {
   const wantRed = kind === 'bug'
   return [
     'You are a senior test engineer writing ONE ' + FW + ' end-to-end spec against a LIVE app.',
-    'APP URL: ' + BASE,
+    'APP URL (for THIS run only): ' + BASE,
     'LOGIN RECIPE:\n' + (cfg.login || '(open app / discover login)'),
     'Write the spec into: ' + E2E + ' (match the existing file/style conventions there — read a neighbouring spec and the helpers first; reuse the project login helper if one exists).',
+    '',
+    'DO NOT HARDCODE THE URL. This suite has to run against localhost, a CI preview and staging without editing every file:',
+    FW === 'cypress'
+      ? '  - Take the origin from Cypress\'s baseUrl (`cy.visit("/tasks")`, relative paths only). If cypress.config.* has no baseUrl, add one defaulting to ' + JSON.stringify(BASE) + ' and overridable by CYPRESS_BASE_URL.'
+      : '  - Navigate with RELATIVE paths (`page.goto("/tasks")`) and let Playwright\'s `use.baseURL` supply the origin. If no playwright.config.* exists in ' + E2E + ', create a minimal one whose baseURL is `process.env.QA_BASE_URL || ' + JSON.stringify(BASE) + '`; if one exists, reuse its baseURL rather than editing specs. Build API calls from the same origin too — never a second literal.',
     '',
     wantRed
       ? 'GOAL: a REGRESSION test that asserts the CORRECT (expected) behaviour, so it FAILS today because of the bug and will turn GREEN once the bug is fixed. Name it after the bug id and tag/title it clearly as a known-bug regression. Do NOT assert the buggy behaviour.'

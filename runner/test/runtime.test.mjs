@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path'
 import { readFileSync, existsSync } from 'node:fs'
 import { pipeline, parallel, runWorkflow } from '../src/runtime.mjs'
 import { stripJsonc, normalizeConfig } from '../src/config.mjs'
+import { fromExploreResult } from '../src/findings.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ENGINE = (p) => resolve(HERE, '..', '..', 'skills', p)
@@ -90,6 +91,51 @@ test('runWorkflow loads report-issues and short-circuits when tracker is disable
     sink,
   })
   assert.deepEqual(result.issues, [])
+})
+
+test('fromExploreResult only carries skeptic-CONFIRMED findings into codify', async () => {
+  const result = [{
+    area: 'Tasks',
+    explore: {
+      worksWell: ['List renders the seeded rows', 'axe-core: 0 serious violations', 'Nav works'],
+      findings: [
+        { title: 'create is a no-op', severity: 'blocker', repro: 'click add', expected: 'row appears' },
+        { title: 'refuted guess', severity: 'major' },
+        { title: 'never verified', severity: 'minor' },
+      ],
+    },
+    verify: {
+      verdicts: [
+        { title: 'create is a no-op', confirmed: true },
+        { title: 'refuted guess', confirmed: false },
+      ],
+    },
+  }]
+
+  const { args, summary } = fromExploreResult(result)
+  assert.equal(args.bugs.length, 1, 'only the confirmed finding becomes a red spec')
+  assert.equal(args.bugs[0].title, 'create is a no-op')
+  assert.equal(args.bugs[0].repro, 'click add')
+  // A skeptic-refuted finding and an unverified one must never reach the suite.
+  assert.ok(!args.bugs.some((b) => /refuted|never verified/.test(b.title)))
+  assert.match(summary, /2 unconfirmed finding\(s\) NOT codified/)
+  // worksWell entries that are not user flows are not specs.
+  assert.deepEqual(args.smokes.map((s) => s.title), ['List renders the seeded rows', 'Nav works'])
+
+  // report gets the same gate, and stamps them verified so the issue body can say so.
+  const rep = fromExploreResult(result, { skill: 'report' })
+  assert.equal(rep.args.findings.length, 1)
+  assert.equal(rep.args.findings[0].verified, true)
+})
+
+test('fromExploreResult caps smokes and reports what the cap dropped', async () => {
+  const result = [{ area: 'A', explore: { findings: [], worksWell: ['a', 'b', 'c', 'd'] }, verify: { verdicts: [] } }]
+  const { args, summary } = fromExploreResult(result, { maxSmokes: 2 })
+  assert.equal(args.smokes.length, 2)
+  assert.match(summary, /2 further working flow\(s\) DROPPED at the --max-smokes cap of 2/)
+  // Default cap keeps all four.
+  assert.equal(fromExploreResult(result).args.smokes.length, 4)
+  assert.throws(() => fromExploreResult({ not: 'an array' }), /expected an explore result array/)
 })
 
 test('the publishable package ships the engines the CLI resolves', async () => {

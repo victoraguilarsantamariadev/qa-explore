@@ -58,7 +58,7 @@ if (findings.length === 0) {
   return { issues: [], summary: 'nothing to file' }
 }
 if (tracker.type !== 'gitlab' && tracker.type !== 'github') {
-  log('qa-report: tracker.type="' + tracker.type + '" — no se archivan issues (tracker desactivado).')
+  log('qa-report: tracker.type="' + tracker.type + '" — no issues filed (tracker disabled).')
   return { issues: [], summary: 'tracker disabled' }
 }
 

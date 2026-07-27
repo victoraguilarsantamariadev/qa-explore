@@ -17,6 +17,18 @@ node bin/qa-explore.mjs explore --config ./qa.config.json --dry-run
 
 `<skill>` = `plan` · `explore` · `report` · `codify` · `fix` · `heal` · `manual` · `gate`. Flags: `--config <path>` `--base <url>` `--mode <explore|no-delete|read-only>` `--model <id>` `--concurrency N` `--dry-run`. `manual` also takes `--audience <end-user|installer>` `--out <file>` `--login-state <state.json>`.
 
+### Chaining the loop headless
+
+`codify` and `report` take their findings as *input* — they do not re-explore. Feed them a previous run's result with `--from`:
+
+```bash
+node bin/qa-explore.mjs explore --config ./qa.config.json > result.json
+node bin/qa-explore.mjs codify --config ./qa.config.json --from ./result.json --max-smokes 6
+node bin/qa-explore.mjs report --config ./qa.config.json --from ./result.json
+```
+
+`--from` carries over **only the findings an independent skeptic confirmed** — interactively a human triages first, and headless that verdict is the gate. It prints exactly what it took and what it dropped, including anything cut by `--max-smokes` (default 8; one agent per smoke is the biggest cost in a codify run). Without `--from`, and with no findings in the config, both skills say so and no-op rather than pretending to have worked.
+
 Not on npm yet — run it from a clone as above (`npm install` inside `runner/`), not via `npx`.
 
 ## Auth — uses your subscription

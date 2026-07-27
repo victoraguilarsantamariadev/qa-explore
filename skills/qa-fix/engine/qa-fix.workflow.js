@@ -115,7 +115,7 @@ const selected = await agent(selectPrompt, { label: 'select-issues', phase: 'Sel
 let issues = (selected && selected.issues) || []
 if (issues.length > MAX) issues = issues.slice(0, MAX)
 if (issues.length === 0) {
-  log('qa-fix: no hay issues marcadas con "' + (tracker.fixLabel || 'qa::confirmed') + '" pendientes de arreglar.')
+  log('qa-fix: no issues labelled "' + (tracker.fixLabel || 'qa::confirmed') + '" are waiting to be fixed.')
   return { fixes: [], summary: 'no approved issues to fix' }
 }
 log('qa-fix: ' + issues.length + ' issue(s) aprobada(s) → un agente por issue (worktree aislado): ' + issues.map((i) => '#' + i.iid).join(', '))
