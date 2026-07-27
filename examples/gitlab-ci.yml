@@ -18,15 +18,44 @@ qa-explore:
   script:
     - git clone --depth 1 https://github.com/victoraguilarsantamariadev/qa-explore.git /tmp/qa-explore
     - (cd /tmp/qa-explore/runner && npm ci --omit=dev)
+    # `artifacts: when: always` collects the evidence even when this job fails, so let a
+    # runner crash fail the job instead of hiding it behind `|| true`.
     - >
       node /tmp/qa-explore/runner/bin/qa-explore.mjs explore
       --config "$CI_PROJECT_DIR/test/E2E/qa.config.json"
       --base "$BASE_URL"
       --mode read-only
-      > "$CI_PROJECT_DIR/qa-explore-result.json" || true
+      > "$CI_PROJECT_DIR/qa-explore-result.json"
   artifacts:
     when: always
     paths:
       - qa-explore-result.json
       - qa-evidence/                 # must match "shotsDir" in qa.config.json
+    expire_in: 1 week
+
+# The release gate: turns the sign-off into something that can actually block a deploy.
+# Reads the findings from the job above, applies the rubric from qa.config.json's `gate`
+# block, and EXITS NON-ZERO on NO-GO. Put your deploy job in a later stage so it can't run.
+qa-gate:
+  stage: test
+  needs: ["qa-explore"]
+  image: mcr.microsoft.com/playwright:v1.48.0-jammy
+  script:
+    - git clone --depth 1 https://github.com/victoraguilarsantamariadev/qa-explore.git /tmp/qa-explore
+    - (cd /tmp/qa-explore/runner && npm ci --omit=dev)
+    - >
+      node /tmp/qa-explore/runner/bin/qa-explore.mjs gate
+      --config "$CI_PROJECT_DIR/test/E2E/qa.config.json"
+      > "$CI_PROJECT_DIR/qa-signoff.json"
+    - |
+      verdict=$(node -e 'const fs=require("fs");try{const r=JSON.parse(fs.readFileSync(process.env.CI_PROJECT_DIR+"/qa-signoff.json","utf8"));process.stdout.write(String((r&&r.verdict)||""))}catch{process.stdout.write("")}')
+      echo "qa-gate verdict: ${verdict:-<none>}"
+      if [ "$verdict" = "NO-GO" ]; then
+        echo "Release blocked. Blockers are listed in the qa-signoff.json artifact."
+        exit 1
+      fi
+  artifacts:
+    when: always
+    paths:
+      - qa-signoff.json
     expire_in: 1 week

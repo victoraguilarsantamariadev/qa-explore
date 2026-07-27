@@ -15,7 +15,9 @@ node bin/qa-explore.mjs explore --config ../path/to/qa.config.json --base http:/
 node bin/qa-explore.mjs explore --config ./qa.config.json --dry-run
 ```
 
-`<skill>` = `explore` · `report` · `codify` · `fix` · `heal`. Flags: `--config <path>` `--base <url>` `--mode <explore|no-delete|read-only>` `--model <id>` `--concurrency N` `--dry-run`.
+`<skill>` = `plan` · `explore` · `report` · `codify` · `fix` · `heal` · `manual` · `gate`. Flags: `--config <path>` `--base <url>` `--mode <explore|no-delete|read-only>` `--model <id>` `--concurrency N` `--dry-run`. `manual` also takes `--audience <end-user|installer>` `--out <file>` `--login-state <state.json>`.
+
+Not on npm yet — run it from a clone as above (`npm install` inside `runner/`), not via `npx`.
 
 ## Auth — uses your subscription
 
@@ -43,6 +45,26 @@ jobs:
 ```
 
 The action installs the runner + Chromium, runs the skill, and uploads `qa-explore-result.json` + the evidence dir as a build artifact. `mode: read-only` is the safe default for CI; switch to `explore`/`no-delete` only against a throwaway/seeded environment.
+
+### Blocking a release
+
+Uploading a report doesn't block anything. To make the gate a real gate, run `skill: gate` — the action reads the verdict and **exits non-zero on NO-GO**, after the evidence upload:
+
+```yaml
+      - uses: victoraguilarsantamariadev/qa-explore/runner@v0
+        with:
+          skill: gate
+          base-url: https://staging.example.com
+          claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          fail-on-no-go: "true"   # default
+```
+
+| input | default | effect |
+|---|---|---|
+| `fail-on-no-go` | `"true"` | NO-GO fails the step, so anything that `needs:` it won't run |
+| `fail-on-error` | `"true"` | a runner crash fails the step instead of passing silently |
+
+Put your deploy job behind `needs: gate`. Both checks run *after* the artifact upload, so a blocked release still ships its evidence.
 
 Pinned to the `v0` tag. Ready-to-copy workflows live in [`examples/`](../examples): `github-actions.yml` and **`gitlab-ci.yml`** (GitLab has no marketplace action — the job clones this repo and runs the runner directly, using a `CLAUDE_CODE_OAUTH_TOKEN` CI/CD variable).
 

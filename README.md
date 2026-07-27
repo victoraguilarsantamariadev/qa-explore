@@ -120,14 +120,20 @@ The typical arc: **`/qa-plan` → `/qa-explore` (→ `/qa-fix`, `/qa-heal`) → 
 
 ### Standalone CLI / CI (no interactive session)
 
-The same engines run headless via the runner (Claude Agent SDK) — for CI, PRs, or scripts, on your subscription:
+The same engines run headless via the runner (Claude Agent SDK) — for CI, PRs, or scripts, on your subscription. The runner is **not published to npm yet**, so run it from a clone:
 
-```
-npx qa-explore <plan|explore|report|codify|fix|heal|manual|gate> [--config <path>] [--base <url>] [--dry-run]
+```bash
+git clone https://github.com/victoraguilarsantamariadev/qa-explore
+cd qa-explore/runner && npm install
+
+node bin/qa-explore.mjs <plan|explore|report|codify|fix|heal|manual|gate> \
+  --config /path/to/your/qa.config.json [--base <url>] [--mode read-only] [--dry-run]
 #   manual: [--audience end-user|installer] [--out <file>] [--login-state <state.json>]
 ```
 
-Wire `verdict === 'NO-GO'` from `qa-explore gate` to a failing CI step to block releases. Copy-paste CI configs live in [`examples/`](examples); point it at a deployed preview with `CLAUDE_CODE_OAUTH_TOKEN`.
+Start with `--dry-run`: it prints the whole plan — phases, agents, caps — without calling the model or spending a token.
+
+Wire `verdict === 'NO-GO'` from the `gate` skill to a failing CI step to block releases. Copy-paste CI configs live in [`examples/`](examples); point it at a deployed preview with `CLAUDE_CODE_OAUTH_TOKEN`.
 
 ## Configure per project
 
@@ -191,7 +197,7 @@ A full exploration is token-heavy. Keep your best model everywhere and control c
 - v0.1 — Claude Code plugin: explore → verify → triage → codify.
 - v0.2 — **the full loop (this):** GitLab/GitHub issue reporter with embedded evidence; `/qa-fix` (labelled issue → isolated-worktree fix → regression test → independent verify → MR); `/qa-heal` (self-healing suite); `/qa-manual` (living user/config documentation from the same drive-your-app engine); multi-viewport (mobile/desktop), multi-**mode** (appStates — re-run in every operational state), multi-role + access-control, an **axe-core a11y** pass, project-type switch (web / electron / API / CLI); safe modes + host confinement.
 - v0.3 — a **standalone runner** (`runner/`, Claude Agent SDK) + **GitHub Action** (`runner@v0`) **and a GitLab CI job** so it runs in CI / on PRs without an interactive session, on your subscription. Same engine via a runtime shim; shim + CLI validated (`node --test`), the live agent path by a live smoke (`npm run smoke`, real SDK). Copy-paste CI configs in [`examples/`](examples). Run it against a deployed preview with `CLAUDE_CODE_OAUTH_TOKEN`.
-- v0.4 — **the QA-process layer:** risk-based `/qa-plan` (impact×likelihood → P0/P1/P2, deterministic ranking) and release-gate `/qa-gate` (deterministic GO/NO-GO sign-off against a written rubric with audited waivers) — the QA-lead bookends around the execution engine. Plus **portability**: pluggable login (prose / saved session / hook / declarative), app-ready (`bootTimeout`/`readySelector`/`warmup`), and a first-class CLI (`npx qa-explore <skill>`).
+- v0.4 — **the QA-process layer:** risk-based `/qa-plan` (impact×likelihood → P0/P1/P2, deterministic ranking) and release-gate `/qa-gate` (deterministic GO/NO-GO sign-off against a written rubric with audited waivers) — the QA-lead bookends around the execution engine. Plus **portability**: pluggable login (prose / saved session / hook / declarative), app-ready (`bootTimeout`/`readySelector`/`warmup`), and a CLI covering every skill (`node runner/bin/qa-explore.mjs <skill>`; npm publish pending).
 - Next — **visual regression** (screenshot diffing); a **perf (Lighthouse)** pass; **Jira / Linear** reporters + SARIF; a `qa-explore init` wizard; inline PR-comment findings.
 
 ## License

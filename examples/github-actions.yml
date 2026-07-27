@@ -26,3 +26,18 @@ jobs:
           mode: ${{ inputs.mode }}
           # config: test/E2E/qa.config.json   # uncomment if not at repo root
           claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  # The release gate — this is the job that can actually stop a deploy. It applies the
+  # rubric from qa.config.json's `gate` block and exits non-zero on NO-GO, so any job
+  # that `needs: gate` won't run. Evidence is uploaded before the failure either way.
+  gate:
+    needs: qa
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: victoraguilarsantamariadev/qa-explore/runner@v0
+        with:
+          skill: gate
+          base-url: ${{ inputs.base-url }}
+          claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          fail-on-no-go: "true"     # default; set "false" to report the verdict without blocking

@@ -3,6 +3,8 @@ import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 export function stripJsonc(s) {
+  // A UTF-8 BOM is what an editor on Windows leaves behind; JSON.parse chokes on it.
+  if (s.charCodeAt(0) === 0xfeff) s = s.slice(1)
   let out = '', i = 0, inStr = false, esc = false
   while (i < s.length) {
     const c = s[i], n = s[i + 1]

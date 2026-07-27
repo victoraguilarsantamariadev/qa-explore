@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { pipeline, parallel, runWorkflow } from '../src/runtime.mjs'
+import { stripJsonc, normalizeConfig } from '../src/config.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ENGINE = (p) => resolve(HERE, '..', '..', 'skills', p)
@@ -29,6 +30,20 @@ test('pipeline: a throwing stage drops that item to null', async () => {
 test('parallel is a barrier and maps throwers to null', async () => {
   const out = await parallel([() => 'a', () => { throw new Error('x') }, async () => 'c'])
   assert.deepEqual(out, ['a', null, 'c'])
+})
+
+test('stripJsonc tolerates a UTF-8 BOM, comments and trailing commas', async () => {
+  // An editor on Windows saves qa.config.json with a BOM; JSON.parse would throw on it.
+  const withBom = '﻿{\n  // the target\n  "baseUrl": "http://localhost:3000",\n  "areas": null,\n}'
+  assert.deepEqual(JSON.parse(stripJsonc(withBom)), { baseUrl: 'http://localhost:3000', areas: null })
+  // a "//" inside a string is not a comment
+  assert.deepEqual(JSON.parse(stripJsonc('{"baseUrl":"http://x.test"}')), { baseUrl: 'http://x.test' })
+})
+
+test('normalizeConfig fills portability defaults and accepts a bare storageState path', async () => {
+  assert.equal(normalizeConfig({}).bootTimeout, 90000)
+  assert.deepEqual(normalizeConfig({ login: ' ./state.json ' }).login, { storageStatePath: './state.json' })
+  assert.equal(normalizeConfig({ login: 'log in as admin' }).login, 'log in as admin')
 })
 
 test('runWorkflow loads the REAL explore-verify engine and runs it with a stubbed agent', async () => {

@@ -4,7 +4,7 @@ author: qa-explore
 
 inputs:
   skill:
-    description: Which engine to run — explore | report | codify | fix | heal.
+    description: Which engine to run — plan | explore | report | codify | fix | heal | manual | gate.
     default: explore
   base-url:
     description: The deployed app URL to test (overrides baseUrl in the config).
@@ -21,6 +21,12 @@ inputs:
   node-version:
     description: Node version.
     default: "20"
+  fail-on-no-go:
+    description: "Fail the step when the gate skill returns verdict NO-GO — this is what actually blocks a release. Set to \"false\" to report only."
+    default: "true"
+  fail-on-error:
+    description: Fail the step when the runner itself crashes. Evidence is uploaded either way, before the failure.
+    default: "true"
 
 runs:
   using: composite
@@ -37,18 +43,23 @@ runs:
         npx --yes playwright install --with-deps chromium
 
     - name: Run qa-explore (${{ inputs.skill }}, mode=${{ inputs.mode }})
+      id: run
       shell: bash
       env:
         # The SDK picks up whichever of these is set. CLAUDE_CODE_OAUTH_TOKEN uses your subscription.
         CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-token }}
         ANTHROPIC_API_KEY: ${{ inputs.claude-token }}
       run: |
+        # Don't fail here — the evidence upload below must run first. The verdict step decides.
+        set +e
         node "${{ github.action_path }}/bin/qa-explore.mjs" "${{ inputs.skill }}" \
           --config "${{ inputs.config }}" \
           --base "${{ inputs.base-url }}" \
           --mode "${{ inputs.mode }}" \
-          > qa-explore-result.json || true
-        echo "result written to qa-explore-result.json"
+          > qa-explore-result.json
+        code=$?
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        echo "result written to qa-explore-result.json (runner exit $code)"
 
     - name: Upload findings + evidence
       uses: actions/upload-artifact@v4
@@ -59,3 +70,39 @@ runs:
           qa-explore-result.json
           /tmp/qa-explore/**
         if-no-files-found: ignore
+
+    # The gate is only a gate if it can fail the build. Runs after the upload so the
+    # evidence is always attached, including on a NO-GO.
+    - name: Enforce verdict
+      shell: bash
+      run: |
+        code="${{ steps.run.outputs.exit-code }}"
+        if [ "$code" != "0" ]; then
+          echo "::error::qa-explore runner exited $code — see the step log above."
+          if [ "${{ inputs.fail-on-error }}" = "true" ]; then
+            exit 1
+          fi
+          exit 0
+        fi
+
+        verdict=$(node -e '
+          const fs = require("fs")
+          try {
+            const r = JSON.parse(fs.readFileSync("qa-explore-result.json", "utf8"))
+            process.stdout.write(String((r && r.verdict) || ""))
+          } catch { process.stdout.write("") }
+        ')
+
+        if [ -z "$verdict" ]; then
+          echo "No verdict in the result (skill=${{ inputs.skill }}); nothing to enforce."
+          exit 0
+        fi
+
+        echo "verdict: $verdict"
+        if [ "$verdict" = "NO-GO" ]; then
+          echo "::error::qa-gate verdict NO-GO — release blocked. Blockers are in the uploaded qa-explore-result.json."
+          if [ "${{ inputs.fail-on-no-go }}" = "true" ]; then
+            exit 1
+          fi
+        fi
+        exit 0
