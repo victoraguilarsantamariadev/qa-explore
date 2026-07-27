@@ -105,18 +105,20 @@ apply RUBRIC (deterministic) → GO ✅ / NO-GO ❌ + exact blockers + audited w
 /plugin install qa-explore@qa-explore
 ```
 
-Then in any project, use the commands (each looks for a `qa.config.json`, or helps you create one):
+Then in any project, invoke a skill (each looks for a `qa.config.json`, or helps you create one). Plugin skills are namespaced `plugin:skill`, so the names are:
 
-| command | what it does | when |
+| skill | what it does | when |
 |---|---|---|
-| `/qa-plan` | risk-based test plan (impact×likelihood → P0/P1/P2 + charter) | start of a release — decide what to test |
-| `/qa-explore` | the explore→verify→report→codify loop (the core) | find bugs; grow the suite |
-| `/qa-fix` | labelled issue → worktree fix → regression test → verified MR | fix the confirmed bugs |
-| `/qa-heal` | repair stale tests (HOW only), flag real regressions | when the suite goes red |
-| `/qa-manual` | living user/config manual by driving the app | document it / update docs |
-| `/qa-gate` | GO / NO-GO release sign-off against a written rubric | before you ship / as a CI gate |
+| `/qa-explore:qa-plan` | risk-based test plan (impact×likelihood → P0/P1/P2 + charter) | start of a release — decide what to test |
+| `/qa-explore:qa-explore` | the explore→verify→report→codify loop (the core) | find bugs; grow the suite |
+| `/qa-explore:qa-fix` | labelled issue → worktree fix → regression test → verified MR | fix the confirmed bugs |
+| `/qa-explore:qa-heal` | repair stale tests (HOW only), flag real regressions | when the suite goes red |
+| `/qa-explore:qa-manual` | living user/config manual by driving the app | document it / update docs |
+| `/qa-explore:qa-gate` | GO / NO-GO release sign-off against a written rubric | before you ship / as a CI gate |
 
-The typical arc: **`/qa-plan` → `/qa-explore` (→ `/qa-fix`, `/qa-heal`) → `/qa-gate`**, with `/qa-manual` whenever the docs need to catch up.
+You can also just describe the task ("QA this app", "write a test plan for this release") — each skill's description triggers it without typing the name. Elsewhere in this README they are abbreviated to `/qa-fix`, `/qa-gate` and so on for readability; the table above has the names you actually type.
+
+The typical arc: **plan → explore (→ fix, heal) → gate**, with manual whenever the docs need to catch up.
 
 ### Standalone CLI / CI (no interactive session)
 
