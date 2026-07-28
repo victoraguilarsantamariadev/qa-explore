@@ -94,7 +94,7 @@ const evidenceHelp = [
   '  - Skip a file that is missing or larger than ' + maxMb + ' MB — instead reference its path in the body (qa-fix can open it locally).',
   isGitlab
     ? '  - GitLab upload: curl -sf --header "PRIVATE-TOKEN: $' + TOK + '" --form "file=@<path>" "<base>/api/v4/projects/<ENC_PROJECT>/uploads"  → the response has a "markdown" field (e.g. "![file](/uploads/..)"); paste that markdown into the issue description to embed it. Upload BEFORE creating the issue and inline the returned markdown in the body.'
-    : '  - GitHub: the gh CLI has no clean file-upload for issues — embed the screenshot if you can, otherwise reference the evidence paths in the body and note they live on the QA machine.',
+    : '  - GitHub has NO issue-attachment API (uploads only work through the web UI), so you cannot embed a local screenshot. Reference the evidence paths in the body, state they live on the QA machine, and paste the decisive console/HTTP line as text so a remote reader still gets the proof.',
   '  - Always embed the screenshot inline (it shows the bug at a glance); put any uploaded video right below it under a "## Watch it happen" heading.',
 ].join('\n')
 
@@ -111,9 +111,16 @@ const apiHelp = (isGitlab
       'The response JSON has "iid" (the human issue number) and "web_url" — return those.',
     ]
   : [
-      'TRACKER = GitHub. Use the gh CLI (already authenticated): repo "' + (tracker.project || '?') + '".',
-      'List open qa-explore issues (for dedup):  gh issue list --repo ' + (tracker.project || '?') + ' --state open --label "' + labels[0] + '" --limit 100 --json number,title,body',
-      'Create:  gh issue create --repo ' + (tracker.project || '?') + ' --title "<t>" --body-file body.md --label "' + labels.join('" --label "') + '"  (it prints the issue URL).',
+      'TRACKER = GitHub. API base: https://api.github.com . Repo "' + (tracker.project || '?') + '".',
+      'Auth header on EVERY call: --header "Authorization: Bearer $' + TOK + '" --header "Accept: application/vnd.github+json" (the token is in that env var; NEVER print it).',
+      'Do NOT assume the gh CLI exists — it often is not installed. Use curl against the REST API as the primary path; only use gh if `gh auth status` succeeds.',
+      'List open qa-explore issues (for dedup):',
+      '  curl -sS --header "Authorization: Bearer $' + TOK + '" --header "Accept: application/vnd.github+json" "https://api.github.com/repos/' + (tracker.project || '?') + '/issues?state=open&labels=' + encodeURIComponent(labels[0]) + '&per_page=100"',
+      'Create an issue (write the JSON body to a temp file, then POST it):',
+      '  curl -sS --write-out "\\nHTTP:%{http_code}\\n" --request POST --header "Authorization: Bearer $' + TOK + '" --header "Accept: application/vnd.github+json" --header "Content-Type: application/json" --data @body.json "https://api.github.com/repos/' + (tracker.project || '?') + '/issues"',
+      '  body.json keys: "title" (string), "body" (string), "labels" (JSON array: ' + JSON.stringify(labels) + ')' + (tracker.assignees && tracker.assignees.length ? ', "assignees" (JSON array)' : '') + '.',
+      'The response JSON has "number" (the human issue number) and "html_url" — return those as iid/url.',
+      'Use -sS (not -sf): -f hides the response body, and on a failure the body is what tells you WHY.',
     ]
 ).join('\n') + evidenceHelp
 
@@ -125,6 +132,11 @@ const result = await agent(
     'Evidence lives under: ' + SHOTS + ' (raw paths are on this machine — UPLOAD the agreed artifacts to the tracker so remote reviewers can see them, and also reference the local paths for the fixer).',
     '',
     apiHelp,
+    '',
+    'FAIL FAST ON PERMISSIONS — do this BEFORE preparing bodies or uploading anything. A token that can read but not write is the most common misconfiguration (fine-grained tokens grant NOTHING by default, so Issues write must be ticked explicitly). File the FIRST finding on its own and inspect the HTTP status:',
+    '  - 401 → the token in $' + TOK + ' is missing, expired or malformed.',
+    '  - 403 / 404-on-write → the token is read-only for issues, or is not scoped to this repository.',
+    '  In either case STOP IMMEDIATELY. Do NOT attempt the remaining findings, and do NOT report them as failed one by one — return a single clear diagnosis: the HTTP status, the response message, and the exact remediation (' + (isGitlab ? 'the token needs the "api" scope and Reporter+ on the project' : 'the fine-grained token needs Issues: Read and write, scoped to ' + (tracker.project || 'this repo')) + '). Only once that first create SUCCEEDS may you continue with the rest.',
     '',
     'DEDUP (mandatory): each finding has a stable FINGERPRINT = "<AREA>::<kebab-slug-of-title>". First fetch the open qa-explore issues. An issue belongs to qa-explore if its body contains a marker line of the exact form:  <!-- qa-fp: <fingerprint> -->  . Before creating an issue for a finding, compute its fingerprint and check whether any open issue already carries that marker. If yes -> do NOT create a duplicate; record action "skipped-duplicate" with that issue iid/url. If no -> create it.',
     '',

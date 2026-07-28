@@ -64,7 +64,10 @@ const api = isGitlab
       'Auth header on EVERY call: --header "PRIVATE-TOKEN: $' + TOK + '"  (token is in that env var; never print it).',
     ].join('\n')
   : [
-      'TRACKER = GitHub. Use the authenticated gh CLI against repo "' + tracker.project + '".',
+      'TRACKER = GitHub. API base: https://api.github.com . Repo "' + tracker.project + '".',
+      'Auth headers on EVERY call: --header "Authorization: Bearer $' + TOK + '" --header "Accept: application/vnd.github+json"  (token is in that env var; never print it).',
+      'The gh CLI is frequently NOT installed — use curl against the REST API. Only fall back to gh if `gh auth status` succeeds.',
+      'Use curl -sS, never -sf: on failure the response body is what tells you why (a read-only token 403s here).',
     ].join('\n')
 
 const SELECT_SCHEMA = {
@@ -112,7 +115,9 @@ const selectPrompt = [
     ? 'List open issues that carry the label "' + (tracker.fixLabel || 'qa::confirmed') + '":\n' +
       '  curl -sf --header "PRIVATE-TOKEN: $' + TOK + '" "<base>/api/v4/projects/<ENC_PROJECT>/issues?state=opened&labels=' + encodeURIComponent(tracker.fixLabel || 'qa::confirmed') + '&per_page=100"\n' +
       'EXCLUDE any issue that also has the "' + (tracker.fixingLabel || 'qa::fixing') + '" label (already being worked) or that already has a linked merge request (check the issue\'s related MRs endpoint: <base>/api/v4/projects/<ENC_PROJECT>/issues/<iid>/related_merge_requests ).'
-    : 'List open issues labelled "' + (tracker.fixLabel || 'qa::confirmed') + '":  gh issue list --repo ' + tracker.project + ' --state open --label "' + (tracker.fixLabel || 'qa::confirmed') + '" --json number,title,body,url . Exclude any that already have a linked PR.',
+    : 'List open issues labelled "' + (tracker.fixLabel || 'qa::confirmed') + '". Do NOT assume the gh CLI is installed — prefer curl against the REST API:\n' +
+      '  curl -sS --header "Authorization: Bearer $' + TOK + '" --header "Accept: application/vnd.github+json" "https://api.github.com/repos/' + tracker.project + '/issues?state=open&labels=' + encodeURIComponent(tracker.fixLabel || 'qa::confirmed') + '&per_page=100"\n' +
+      'Each item has "number", "title", "body", "html_url", "labels" and "pull_request" (present only when the item IS a PR — skip those). EXCLUDE any issue that also carries "' + (tracker.fixingLabel || 'qa::fixing') + '" (already being worked) or that already has a linked PR (search for an open PR whose body contains "Closes #<number>").',
   '',
   'Return up to ' + MAX + ' issues, each with iid/number, title, the FULL body (we need the repro + evidence + the <!-- qa-fp --> marker), and the url. If none qualify, return an empty list.',
 ].join('\n')
@@ -142,7 +147,7 @@ function fixerPrompt(issue) {
     'DO THIS IN ORDER:',
     '1. CLAIM IT: add the label "' + (tracker.fixingLabel || 'qa::fixing') + '" to the issue and post a short comment that qa-fix is starting (' + (isGitlab
       ? 'PUT <base>/api/v4/projects/<ENC>/issues/' + issue.iid + ' with add_labels=' + (tracker.fixingLabel || 'qa::fixing') + ' ; POST .../issues/' + issue.iid + '/notes for the comment'
-      : 'gh issue edit ' + issue.iid + ' --add-label "' + (tracker.fixingLabel || 'qa::fixing') + '"; gh issue comment ' + issue.iid) + '). If you bail out later, REMOVE that label again.',
+      : 'curl -sS -X POST -H "Authorization: Bearer $' + TOK + '" -H "Accept: application/vnd.github+json" -d \'{"labels":["' + (tracker.fixingLabel || 'qa::fixing') + '"]}\' "https://api.github.com/repos/' + tracker.project + '/issues/' + issue.iid + '/labels" ; then POST .../issues/' + issue.iid + '/comments with {"body":"..."} for the comment. Remove it later with DELETE .../issues/' + issue.iid + '/labels/' + encodeURIComponent(tracker.fixingLabel || 'qa::fixing') + '. If the label does not exist yet in the repo, create it first: POST /repos/' + tracker.project + '/labels with {"name":"...","color":"ededed"}') + '). If you bail out later, REMOVE that label again.',
     '2. UNDERSTAND the bug from the repro steps + linked evidence/trace (you may observe it on ' + BASE + ', but remember that is the OLD code). Find the real root cause — do not guess.',
     '3. WRITE A REGRESSION TEST that asserts the EXPECTED/correct behaviour and RUNS AGAINST THE CHANGED CODE per the rule above (code-level test preferred; E2E only against a local build of the worktree). Put it in ' + E2E + ' or the matching unit/integration test location, matching the neighbouring tests\' style. Confirm it is RED right now (before your fix) and fails for the RIGHT reason (the assertion), not a broken selector/login/setup.',
     '4. FIX THE CODE (smallest correct change; follow the repo conventions and any CLAUDE.md). Re-run the regression test against the changed code until it is GREEN.',
@@ -150,7 +155,9 @@ function fixerPrompt(issue) {
     '6. OPEN THE MR: create a branch "qa-fix/' + issue.iid + '-<short-slug>" off ' + TARGET + ', commit (fix + the new test) with a message referencing the issue, push the branch, and open a merge request targeting "' + TARGET + '".' + TARGET_NOTE + ' ' +
       (isGitlab
         ? 'POST <base>/api/v4/projects/<ENC>/merge_requests with source_branch, target_branch="' + TARGET + '", title="Fix #' + issue.iid + ': ...", description including "Closes #' + issue.iid + '" and what you changed' + (tracker.assignees && tracker.assignees.length ? ', and assign the reviewers' : '') + ', remove_source_branch=true.'
-        : 'Use: git push -u origin <branch>; then gh pr create --base ' + TARGET + ' --title "Fix #' + issue.iid + ': ..." --body "Closes #' + issue.iid + ' ...".') +
+        : 'Use: git push -u origin <branch>; then create the PR via the REST API (do NOT assume gh exists):\n' +
+          '  curl -sS --write-out "\\nHTTP:%{http_code}\\n" -X POST -H "Authorization: Bearer $' + TOK + '" -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" --data @pr.json "https://api.github.com/repos/' + tracker.project + '/pulls"\n' +
+          '  pr.json keys: "title" ("Fix #' + issue.iid + ': ..."), "head" (your branch name), "base" ("' + TARGET + '"), "body" (must contain "Closes #' + issue.iid + '" plus what you changed). The response has "number" and "html_url".') +
       ' Then comment the MR link on the issue and REPLACE the "' + (tracker.fixingLabel || 'qa::fixing') + '" label with nothing (leave the human gate label as-is).',
     '',
     'IF YOU CANNOT SAFELY FIX IT (needs a product/design decision, root cause unclear, or the fix is too risky to do blind): do NOT force a bad MR. Post a comment on the issue explaining what you found and what blocks an automatic fix, remove the "' + (tracker.fixingLabel || 'qa::fixing') + '" label, and return status "skipped-unfixable". A weak or speculative fix is worse than none.',
@@ -218,7 +225,7 @@ function verifyFixPrompt(issue, f) {
     '4. BUG ACTUALLY GONE: re-run the ORIGINAL repro against the changed code (code-level, or a local build per the rule — NEVER ' + BASE + ') → the bug must be gone. If not → "not-fixed".',
     '5. NO COLLATERAL DAMAGE: run ' + (BUILDTEST ? '`' + BUILDTEST + '`' : 'the project checks') + ' + the relevant suite; scan the diff for side-effects.',
     '',
-    'POST your verdict as a comment on the MR (' + (isGitlab ? 'POST <base>/api/v4/projects/<ENC>/merge_requests/<mr_iid>/notes' : 'gh pr comment <mr>') + '): a short ✅/⚠️ summary of checks 1–5 and your conclusion. ' + (isGitlab ? 'Add label "qa::fix-verified" to the MR if ALL pass, otherwise "qa::fix-doubt".' : 'Prefix the comment with [qa fix-verified] or [qa fix-doubt].') + ' Do NOT merge and do NOT modify the fix — you only review.',
+    'POST your verdict as a comment on the MR (' + (isGitlab ? 'POST <base>/api/v4/projects/<ENC>/merge_requests/<mr_iid>/notes' : 'POST https://api.github.com/repos/' + tracker.project + '/issues/<pr_number>/comments with {"body":"..."} — PR comments use the ISSUES endpoint on GitHub, with the PR number as the issue number') + '): a short ✅/⚠️ summary of checks 1–5 and your conclusion. ' + (isGitlab ? 'Add label "qa::fix-verified" to the MR if ALL pass, otherwise "qa::fix-doubt".' : 'Prefix the comment with [qa fix-verified] or [qa fix-doubt].') + ' Do NOT merge and do NOT modify the fix — you only review.',
     '',
     'Return ONLY the structured object with your verdict.',
   ].join('\n')

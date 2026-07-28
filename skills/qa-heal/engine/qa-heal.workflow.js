@@ -47,7 +47,7 @@ const hasTracker = tracker.type === 'gitlab' || tracker.type === 'github'
 const api = isGitlab
   ? 'TRACKER = GitLab. API base: ' + (tracker.host || 'https://gitlab.com') + '/api/v4 . Project "' + tracker.project + '" -> URL-encode "/" as %2F. Auth header on EVERY call: --header "PRIVATE-TOKEN: $' + TOK + '" (token in that env var; never print it).'
   : hasTracker
-    ? 'TRACKER = GitHub. Use the authenticated gh CLI against repo "' + tracker.project + '".'
+    ? 'TRACKER = GitHub. API base: https://api.github.com . Repo "' + tracker.project + '". Auth headers on EVERY call: --header "Authorization: Bearer $' + TOK + '" --header "Accept: application/vnd.github+json" (never print the token). The gh CLI is frequently NOT installed — use curl against the REST API, and prefer curl -sS so a failure body is visible.'
     : 'NO TRACKER configured: do not open a MR — instead commit the repairs to a local branch "qa-heal/<date-slug>" and report the branch name + the diff so the user can review/push it.'
 
 // ---------- Phase 1: collect failing tests (skipped if supplied) ----------
@@ -141,7 +141,7 @@ const healResult = await agent(
     '',
     'AFTER adjudicating all: if you repaired ANY test, put all repairs on ONE branch "qa-heal/' + failures.length + 'tests-<short-slug>" off ' + TARGET + ',' + TARGET_NOTE + ' commit (message: "qa-heal: repair stale tests"), ' +
       (hasTracker
-        ? 'push it and open ONE merge request targeting "' + TARGET + '" that lists each repaired test and EXACTLY what HOW-level change you made (so a reviewer can confirm no assertion moved). ' + (isGitlab ? 'POST <base>/api/v4/projects/<ENC>/merge_requests.' : 'gh pr create --base ' + TARGET + '.')
+        ? 'push it and open ONE merge request targeting "' + TARGET + '" that lists each repaired test and EXACTLY what HOW-level change you made (so a reviewer can confirm no assertion moved). ' + (isGitlab ? 'POST <base>/api/v4/projects/<ENC>/merge_requests.' : 'Do NOT assume the gh CLI exists — POST https://api.github.com/repos/' + tracker.project + '/pulls with {"title","head","base":"' + TARGET + '","body"}, using the headers "Authorization: Bearer $' + TOK + '" and "Accept: application/vnd.github+json".')
         : 'leave it as a local branch and report its name + the diff.') +
       ' Do NOT include the real-regression tests in the MR (leave them red).',
     'Never weaken an assertion. Never merge. Return ONLY the structured object with one verdict per test (+ branch/mrUrl if you opened one).',
@@ -180,7 +180,7 @@ if (VERIFY && mrUrl && healed.length) {
       'Check out the branch (' + (healResult.branch || '<branch>') + ') in your own worktree. ' + api,
       'Read the full diff (`git diff ' + TARGET + '...HEAD`). For EVERY changed test: confirm the change is ONLY selector/locator/wait/setup, and the assertion(s) about behaviour/data are byte-for-byte the same intent. Flag any test where an expect/assert/should was relaxed, removed, or changed.',
       'Then run the repaired tests → they must pass against ' + BASE + '.',
-      'Comment your verdict on the MR (' + (isGitlab ? 'POST .../merge_requests/<iid>/notes + label qa::heal-verified or qa::heal-doubt' : 'gh pr comment') + '): ✅ if assertions intact + green, ⚠️ listing any suspect test otherwise.',
+      'Comment your verdict on the MR (' + (isGitlab ? 'POST .../merge_requests/<iid>/notes + label qa::heal-verified or qa::heal-doubt' : 'POST https://api.github.com/repos/' + tracker.project + '/issues/<pr_number>/comments with {"body":"..."} — GitHub PR comments go through the issues endpoint') + '): ✅ if assertions intact + green, ⚠️ listing any suspect test otherwise.',
       'Return ONLY the structured object.',
     ].join('\n'),
     { label: 'verify-heal', phase: 'Verify-heal', schema: VERIFY_SCHEMA, agentType: 'general-purpose', isolation: 'worktree' }
