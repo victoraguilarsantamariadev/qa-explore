@@ -158,6 +158,27 @@ test('the publishable package ships the engines the CLI resolves', async () => {
   }
 })
 
+test('no engine log() string is left in Spanish', async () => {
+  // Three hand-written sweeps each missed strings, because each guessed at patterns. This
+  // enumerates every literal inside every log() call and rejects known Spanish words outright.
+  const SPANISH = /\b(nuevas?|duplicadas?|saltadas?|fallidas?|estrategia|aprobada|soportado|archivan|desactivado|aislado|hallazgos?|bloqueantes?|veredicto|terminado|reparados?|regresi[oó]n|aserci[oó]n|unidades|cobertura|muestreo|ronda|huecos?|riesgos?|evaluadas?|pendientes?|abiertas|verificadas|dudas|sanar|un solo|no hay|issues? nuevas)\b/i
+  const engines = ['qa-explore/engine/codify.workflow.js', 'qa-explore/engine/explore-verify.workflow.js',
+    'qa-explore/engine/report-issues.workflow.js', 'qa-fix/engine/qa-fix.workflow.js',
+    'qa-gate/engine/qa-gate.workflow.js', 'qa-heal/engine/qa-heal.workflow.js',
+    'qa-plan/engine/qa-plan.workflow.js']
+  const offenders = []
+  for (const rel of engines) {
+    const src = readFileSync(ENGINE(rel), 'utf8')
+    for (const line of src.split('\n')) {
+      if (!/\blog\(/.test(line)) continue
+      for (const m of line.matchAll(/'((?:[^'\\]|\\.)*)'/g)) {
+        if (SPANISH.test(m[1])) offenders.push(rel + ': ' + m[1].trim())
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], 'Spanish left in user-facing log output')
+})
+
 test('all engine files load (parse) on the shim', async () => {
   const { loadWorkflow } = await import('../src/runtime.mjs')
   for (const p of [

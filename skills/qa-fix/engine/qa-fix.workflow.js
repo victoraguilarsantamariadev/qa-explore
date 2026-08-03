@@ -239,7 +239,7 @@ function verifyOne(issue, f) {
 
 let clean
 if (STRATEGY === 'batched') {
-  log('qa-fix: estrategia "batched" → un solo MR con ' + issues.length + ' fix(es).')
+  log('qa-fix: "batched" strategy → a single MR carrying ' + issues.length + ' fix(es).')
   const BATCH_SCHEMA = {
     type: 'object', additionalProperties: false,
     properties: { fixes: { type: 'array', items: FIX_SCHEMA } },

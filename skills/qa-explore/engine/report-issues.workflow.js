@@ -162,5 +162,5 @@ const issues = (result && result.issues) || []
 const created = issues.filter((i) => i.action === 'created').length
 const dup = issues.filter((i) => i.action === 'skipped-duplicate').length
 const failed = issues.filter((i) => i.action === 'failed').length
-log('qa-report: ' + created + ' issues nuevas, ' + dup + ' duplicadas (saltadas), ' + failed + ' fallidas.')
+log('qa-report: ' + created + ' new issue(s), ' + dup + ' duplicate(s) skipped, ' + failed + ' failed.')
 return result || { issues: [] }
