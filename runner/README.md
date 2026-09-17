@@ -2,7 +2,7 @@
 
 Run the qa-explore engines **headless** — no interactive Claude Code session — so they work in CI / on a PR. It runs the *exact same* `skills/*/engine/*.workflow.js` files the Claude Code plugin uses, via a thin runtime shim over the [Claude Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk). One engine, two runtimes.
 
-> Status: **v0.4.0**. The runtime shim, CLI, config normalisation and `--dry-run` are validated by `node --test`; the live agent path (real Agent SDK, text + structured) by `npm run smoke`. The full explore→verify loop has been run end-to-end against a live target. See Auth.
+> Status: **v0.4.0**. `node --test` covers the runtime shim, the CLI, config normalisation, the agent layer (concurrency, failure isolation, cost), every engine end-to-end on stubs, the safety rails carried by the prompts (write mode, host confinement, roles, app states, evidence protocol) and the evidence housekeeping; `--dry-run` likewise. The live agent path (real Agent SDK, text + structured) is covered by `npm run smoke`. The full explore→verify loop has been run end-to-end against a live target. See Auth.
 
 ## Install & run locally
 
@@ -15,7 +15,7 @@ node bin/qa-explore.mjs explore --config ../path/to/qa.config.json --base http:/
 node bin/qa-explore.mjs explore --config ./qa.config.json --dry-run
 ```
 
-`<skill>` = `plan` · `explore` · `report` · `codify` · `fix` · `heal` · `manual` · `gate`. Flags: `--config <path>` `--base <url>` `--mode <explore|no-delete|read-only>` `--model <id>` `--concurrency N` `--dry-run`. `manual` also takes `--audience <end-user|installer>` `--out <file>` `--login-state <state.json>`.
+`<skill>` = `plan` · `explore` · `report` · `codify` · `fix` · `heal` · `manual` · `gate`. Flags: `--config <path>` `--base <url>` `--mode <explore|no-delete|read-only>` `--model <id>` `--concurrency N` `--dry-run` `--allow-volatile-evidence`. `manual` also takes `--audience <end-user|installer>` `--out <file>` `--login-state <state.json>`.
 
 ### Chaining the loop headless
 
@@ -28,6 +28,8 @@ node bin/qa-explore.mjs report --config ./qa.config.json --from ./result.json
 ```
 
 `--from` carries over **only the findings an independent skeptic confirmed** — interactively a human triages first, and headless that verdict is the gate. It prints exactly what it took and what it dropped, including anything cut by `--max-smokes` (default 8; one agent per smoke is the biggest cost in a codify run). Without `--from`, and with no findings in the config, both skills say so and no-op rather than pretending to have worked.
+
+A run writes gigabytes of trace/video into `shotsDir`, so the runner refuses to start when that path is on a tmpfs (RAM) — point it at a disk path, or pass `--allow-volatile-evidence` if the container is thrown away afterwards.
 
 Not on npm yet — run it from a clone as above (`npm install` inside `runner/`), not via `npx`.
 

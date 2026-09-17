@@ -12,6 +12,7 @@ import { runWorkflow } from '../src/runtime.mjs'
 import { makeAgent } from '../src/agent.mjs'
 import { loadConfig } from '../src/config.mjs'
 import { fromExploreResultFile } from '../src/findings.mjs'
+import { volatileFsAt } from '../../skills/qa-explore/engine/evidence.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SKILLS = resolve(HERE, '..', '..', 'skills')   // runner/ sits next to skills/ in the repo
@@ -31,6 +32,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const t = argv[i]
     if (t === '--dry-run') a.dryRun = true
+    else if (t === '--allow-volatile-evidence') a.allowVolatile = true
     else if (t.startsWith('--')) a[t.slice(2)] = argv[++i]
     else a._.push(t)
   }
@@ -41,7 +43,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2))
   const skill = args._[0]
   if (!skill || !ENGINES[skill]) {
-    console.error('usage: qa-explore <plan|explore|report|codify|fix|heal|manual|gate> [--config <path>] [--base <url>] [--model <id>] [--concurrency N] [--dry-run]')
+    console.error('usage: qa-explore <plan|explore|report|codify|fix|heal|manual|gate> [--config <path>] [--base <url>] [--model <id>] [--concurrency N] [--dry-run] [--allow-volatile-evidence]')
     console.error('  codify/report: [--from <explore-result.json>]  carry over the skeptic-CONFIRMED findings of a previous run')
     console.error('  manual-only: [--audience end-user|installer] [--out <file>] [--login-state <state.json>]')
     console.error('  gate: aggregates a prior explore result into a GO/NO-GO sign-off (see qa-gate skill)')
@@ -73,6 +75,16 @@ async function main() {
     if (!have) console.error('  note: no findings supplied — pass --from <explore-result.json>, or put them in the config. Nothing to do.')
   }
   console.error('qa-explore runner · skill=' + skill + ' · config=' + cfgPath + ' · target=' + (config.baseUrl || '(none)') + (args.dryRun ? ' · DRY-RUN' : ''))
+
+  // A run writes GBs of trace/video into shotsDir. On a tmpfs that is RAM, and it stays eaten after the
+  // job ends — harmless in a throwaway container (hence the opt-out), fatal on a long-lived build machine.
+  const shots = config.shotsDir || './qa-evidence'
+  const volatile = volatileFsAt(shots)
+  if (volatile && !args.allowVolatile) {
+    console.error('qa-explore: shotsDir "' + shots + '" is on a ' + volatile + ' (RAM), and a full run writes several GB there.')
+    console.error('  Point "shotsDir" at a disk path, or pass --allow-volatile-evidence if this container is thrown away afterwards.')
+    process.exit(1)
+  }
 
   let sdkQuery = null
   if (!args.dryRun) {

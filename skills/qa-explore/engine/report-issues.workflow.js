@@ -27,7 +27,7 @@ export const meta = {
 const cfg = args || {}
 const tracker = cfg.tracker || {}
 const findings = (cfg.findings || [])
-const SHOTS = cfg.shotsDir || '/tmp/qa-explore'
+const SHOTS = cfg.shotsDir || './qa-evidence'
 const BASE = cfg.baseUrl || '(app url not provided)'
 
 const RESULT_SCHEMA = {

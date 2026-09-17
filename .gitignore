@@ -3,10 +3,12 @@ HANDOFF.md
 
 # qa-explore runtime artifacts
 /tmp/
+qa-evidence/
 *.har
 *.zip
+*.webm
 storageState.json
 node_modules/
 .DS_Store
 
-# screenshots / reports are written to shotsDir (default /tmp/qa-explore), not the repo
+# screenshots / reports are written to shotsDir (default ./qa-evidence), not into the plugin

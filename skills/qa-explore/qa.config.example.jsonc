@@ -94,7 +94,28 @@
 
   // Where to put screenshots, evidence (trace/HAR/video/console) and the generated report.
   // The shared login session is cached here as storageState.json and reused by every agent.
-  "shotsDir": "/tmp/qa-explore",
+  // ⚠️ PUT THIS ON DISK, NOT ON /tmp. A full run writes GBs of trace + video, and on most Linux boxes
+  // /tmp is a tmpfs — i.e. RAM — so the evidence eats the machine's memory and stays eaten until it is
+  // deleted. The skill runs `evidence.mjs check` on this path first and refuses a tmpfs. Add it to
+  // your project .gitignore.
+  "shotsDir": "./qa-evidence",
+
+  // How much evidence survives the run. Trace/video/HAR are captured for EVERY area and EVERY
+  // suspicion, but only the ones behind a real finding are ever opened again — so after the report is
+  // written, `evidence.mjs prune` drops the rest. Screenshots, console logs and the report itself are
+  // never pruned (small, and they ARE the report). In practice this is ~3.5 GB/run → ~150 MB/run.
+  "evidence": {
+    // "confirmed-only" (default) keep the trace/video/HAR of findings the Verify pass confirmed (and
+    //                            of anything filed to the tracker); drop everything else.
+    // "findings"                 keep the evidence of EVERY reported finding, confirmed or not —
+    //                            useful while you are still tuning domainNotes and rejecting a lot.
+    // "all"                      keep everything (prune is a no-op). Costs what it used to cost.
+    "retain": "confirmed-only",
+
+    // Recording size for the repro videos. The browser viewport can be 1440x900 while the video is
+    // small: it is there to watch what happened, not to judge pixels (that is what the PNGs are for).
+    "videoSize": { "width": 800, "height": 450 }
+  },
 
   // Directory that has @playwright/test + chromium installed AND is where Codify writes specs.
   "e2eDir": "./e2e",

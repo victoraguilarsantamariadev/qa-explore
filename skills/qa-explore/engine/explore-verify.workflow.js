@@ -17,8 +17,13 @@ export const meta = {
 
 const cfg = args || {}
 const BASE = (cfg.baseUrl || 'http://localhost') + (cfg.appPath || '/')
-const SHOTS = cfg.shotsDir || '/tmp/qa-explore'
+// Evidence lands on DISK, never on a tmpfs: a full run writes GBs of trace/video, and a RAM-backed
+// shotsDir (the old /tmp default) eats the machine's memory until something deletes it. The skill runs
+// `evidence.mjs check` on the resolved path before we get here.
+const SHOTS = cfg.shotsDir || './qa-evidence'
 const E2E = cfg.e2eDir || 'the project E2E directory'
+const EVID = cfg.evidence || {}
+const VIDEO_SIZE = EVID.videoSize || { width: 800, height: 450 }
 
 // ---- safety: what the run may DO, and WHERE it may reach ----
 const MODE = (cfg.mode === 'read-only' || cfg.mode === 'no-delete') ? cfg.mode : 'explore'
@@ -93,7 +98,9 @@ function handsBlock(stateFile) {
     launch,
     '  - YOUR DRIVER SCRIPTS ARE THROWAWAY — KEEP THEM OUT OF THE SUITE. Write every scratch script you run to ' + SHOTS + '/<AREA_KEY>/driver/ (mkdir -p first) and run it from there, e.g. `node ' + SHOTS + '/<AREA_KEY>/driver/probe.mjs`. NEVER create a file inside ' + E2E + ', and never name a scratch file *.test.* / *.spec.* / *.cy.* anywhere: those globs are the project\'s regression suite, so a leftover exploration script would be picked up by the NEXT run\'s Step 0 and reported as a failing baseline test. Only the separate Codify pass is allowed to add specs. If you did create anything in ' + E2E + ', delete it before you finish.',
     '  - LOGIN SESSION REUSE (saves tokens): if ' + stateFile + ' exists, create the context with { storageState: "' + stateFile + '" } and SKIP the login steps. If it does NOT exist, log in per the recipe once and immediately persist it: await context.storageState({ path: "' + stateFile + '" }). (sessionStorage-based logins: also re-set the JWT after navigations as the recipe says.)',
-    '  - EVIDENCE (mandatory, this is what makes a finding credible): create the context with recordVideo:{ dir: "' + SHOTS + '/<AREA_KEY>/video" } and recordHar:{ path: "' + SHOTS + '/<AREA_KEY>/network.har" }; call context.tracing.start({ screenshots:true, snapshots:true, sources:true }) at the start; subscribe page.on("console") and page.on("pageerror") and append every line to ' + SHOTS + '/<AREA_KEY>/console.log. When you hit a finding, call context.tracing.stop({ path: "' + SHOTS + '/<AREA_KEY>/trace-<n>.zip" }) capturing that repro. Attach the trace/har/video/console paths and the exact console/HTTP error to the finding.',
+    '  - EVIDENCE (mandatory, this is what makes a finding credible): create the context with recordVideo:{ dir: "' + SHOTS + '/<AREA_KEY>/video", size: { width: ' + VIDEO_SIZE.width + ', height: ' + VIDEO_SIZE.height + ' } } and recordHar:{ path: "' + SHOTS + '/<AREA_KEY>/network.har" }; subscribe page.on("console") and page.on("pageerror") and append every line to ' + SHOTS + '/<AREA_KEY>/console.log. Attach the trace/har/video/console paths and the exact console/HTTP error to each finding.',
+    '  - TRACE PER FINDING, NEVER PER SESSION (hard rule — a session-long trace is ~80 MB of screencast to document a 15-second bug, too big to attach to an issue and pure waste for the 90% of steps that work): call context.tracing.start({ screenshots:true, snapshots:true, sources:false }) ONCE right after creating the context, then record in CHUNKS. Before EVERY step that could be a bug: await context.tracing.startChunk({ title: "<what you are about to do>" }). After it: if it IS a finding, await context.tracing.stopChunk({ path: "' + SHOTS + '/<AREA_KEY>/trace-<n>.zip" }) — that file now holds JUST this repro; if the step was fine, await context.tracing.stopChunk() with NO path, which discards the chunk at no cost. Do NOT use tracing.stop() to capture a finding: it would dump the whole session.',
+    '  - ALWAYS close the context: wrap the run in try/finally and await context.close() in the finally. That is what flushes the video file and removes Playwright\'s temp dir — skip it and the video is left unplayable while gigabytes leak into /tmp.',
     '  - Screenshot EVERY meaningful step into ' + SHOTS + '/<AREA_KEY>/NN-step.png (mkdir -p first). Then use the Read tool on the meaningful PNGs to actually LOOK at them — this visual check is the core of the job; never claim something looks right without having read its screenshot.',
     viewportBlock(),
     a11yBlock(),
