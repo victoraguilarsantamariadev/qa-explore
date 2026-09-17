@@ -25,6 +25,7 @@ const ENGINES = {
   manual: 'qa-manual/engine/qa-manual.workflow.js',
   gate: 'qa-gate/engine/qa-gate.workflow.js',
   plan: 'qa-plan/engine/qa-plan.workflow.js',
+  sec: 'qa-sec/engine/qa-sec.workflow.js',
 }
 
 function parseArgs(argv) {
@@ -43,7 +44,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2))
   const skill = args._[0]
   if (!skill || !ENGINES[skill]) {
-    console.error('usage: qa-explore <plan|explore|report|codify|fix|heal|manual|gate> [--config <path>] [--base <url>] [--model <id>] [--concurrency N] [--dry-run] [--allow-volatile-evidence]')
+    console.error('usage: qa-explore <plan|explore|report|codify|fix|heal|manual|gate|sec> [--config <path>] [--base <url>] [--model <id>] [--concurrency N] [--dry-run] [--allow-volatile-evidence]')
     console.error('  codify/report: [--from <explore-result.json>]  carry over the skeptic-CONFIRMED findings of a previous run')
     console.error('  manual-only: [--audience end-user|installer] [--out <file>] [--login-state <state.json>]')
     console.error('  gate: aggregates a prior explore result into a GO/NO-GO sign-off (see qa-gate skill)')

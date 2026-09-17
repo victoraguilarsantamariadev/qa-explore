@@ -209,6 +209,34 @@
     "verify": true                            // set false to skip the adversarial fix check
   },
 
+  // ---- /qa-sec: defensive security review (only used by the qa-sec skill) ----
+  // Reviews an app YOU OWN so you can fix what it finds. Detection-first: it proves a hole exists and
+  // stops — it never reads real data beyond the one record that proves the exposure, never modifies or
+  // deletes anything, never plants anything that persists, and never load-tests. Scope is `allowedHosts`.
+  "security": {
+    // ⚠️ REQUIRED. Without authorized:true the engine returns immediately and does nothing.
+    // `scope` records WHAT is being reviewed and WHO said yes — this is a live system.
+    "authorized": false,
+    "scope": "",                              // e.g. "staging.example.com, our own app, authorised by Víctor"
+
+    // "passive" (default) = sends NOTHING beyond normal use: it logs in, browses, and audits the headers,
+    //           cookies, token lifecycle, JS bundle and error pages the app already serves. Safe anywhere.
+    // "safe-active" = the above PLUS benign markers into inputs the app exposes and calls to endpoints the
+    //           app itself calls with altered parameters (reflection, traversal, open redirect, SSRF,
+    //           upload type enforcement, server-side validation, business-logic abuse). Still no
+    //           destructive payloads, no persistence, no bulk reads, no stress. Staging, or prod on request.
+    "intrusiveness": "passive",
+
+    // The access-control pass is MUCH stronger with a second, lower-privileged account: most of what it
+    // hunts is one user reaching another user's data. It reads `roles` above — declare two.
+    "maxLoginAttempts": 8,                    // only to check that lockout/rate-limiting EXISTS. Never a brute force.
+    "maxAreas": 8,                            // cap on the areas the input/logic pass covers
+
+    // Findings rejected as intentional/accepted risk, WITH the reason. The security twin of domainNotes:
+    // anything listed here is never raised again. An accepted risk is a decision — write it down.
+    "knownAccepted": ""                       // e.g. "- No HSTS: the app is only served internally over a VPN."
+  },
+
   // ---- /qa-heal: self-healing suite (only used by the qa-heal skill) ----
   // When the deterministic suite goes red, qa-heal repairs STALE tests (selectors/waits) and flags REAL
   // regressions as bugs. Cardinal rule it enforces: heal the HOW, never the WHAT (assertions) — a green

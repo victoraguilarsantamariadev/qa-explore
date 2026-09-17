@@ -88,6 +88,29 @@ apply RUBRIC (deterministic) → GO ✅ / NO-GO ❌ + exact blockers + audited w
 - **Waivers are first-class and audited** — an accepted risk leaves the blocker list but is **printed in the sign-off** with who approved it and why. Never silent.
 - **Honest about coverage** — a signal that wasn't collected reads "not assessed", never "clean". On NO-GO, the blockers ARE the fix list for `/qa-fix`.
 
+### …and reviews its security — `/qa-sec`
+
+Same engine, different question: not *is this broken?* but *can someone abuse this?* — on an app **you own**, so you can fix it before someone else finds it.
+
+```
+Surface        → what is actually exposed: inputs, ids, uploads, redirects, privileged actions
+Passive        → headers/CSP/CORS · cookies + token lifecycle · secrets & source maps in the bundle
+                 · leaky error pages · HIGH/CRITICAL dependency advisories        [sends nothing]
+Access-control → forced browsing · hidden-but-not-blocked · IDOR/BOLA · mass assignment · tenant
+                 boundaries — one agent per role                    [the expensive bugs live here]
+Input & logic  → reflection · traversal · open redirect · SSRF · upload enforcement · server-side
+                 validation · BUSINESS-LOGIC abuse                         [safe-active only]
+Verify         → an independent skeptic reproduces each serious finding, in both directions
+```
+
+- **A review, not an attack.** Detection-first: it proves a hole exists and **stops**. Never reads real data beyond the one record that proves the exposure (redacted), never modifies or deletes anything, never plants anything that persists, never load-tests, and only ever uses the configured credentials.
+- **Two gates before it moves.** `security.authorized` must be `true` with a written `security.scope` — without it the engine returns having spawned nothing. Scope is `allowedHosts`; an off-host finding is recorded, not chased.
+- **`passive` by default** — safe on anything, any time, because it sends nothing beyond normal use of the app. `safe-active` adds benign markers to inputs the app exposes.
+- **Access control is the point.** Missing headers are worth fixing; one user reading another's data is what actually hurts. It gets its own pass, and `/qa-gate` already treats a confirmed access-control finding as non-negotiable NO-GO.
+- **Accepted risks are written down** in `security.knownAccepted` with the reason, and never raised again — the security twin of `domainNotes`.
+
+Not a pentest: no chained exploitation, no infrastructure, no fuzzing at depth. It catches the flat, common, expensive things — the ones that are embarrassing to hear about from someone else.
+
 ## What makes it different from "a bot that clicks"
 
 - **Adversarial verification** — every **blocker/major** finding is re-run by an independent skeptic before you ever see it, and the skeptic can also *downgrade* a severity it thinks was overstated. Minor findings (including every a11y hit) are below that threshold: they still get filed when the evidence is hard, but each one says **"verified: not assessed"** so a single-agent observation never reads as a confirmed one.
@@ -114,11 +137,12 @@ Then in any project, invoke a skill (each looks for a `qa.config.json`, or helps
 | `/qa-explore:qa-fix` | labelled issue → worktree fix → regression test → verified MR | fix the confirmed bugs |
 | `/qa-explore:qa-heal` | repair stale tests (HOW only), flag real regressions | when the suite goes red |
 | `/qa-explore:qa-manual` | living user/config manual by driving the app | document it / update docs |
+| `/qa-explore:qa-sec` | defensive security review: headers/tokens, access control, input + logic | before a release; after auth/permission/upload changes |
 | `/qa-explore:qa-gate` | GO / NO-GO release sign-off against a written rubric | before you ship / as a CI gate |
 
 You can also just describe the task ("QA this app", "write a test plan for this release") — each skill's description triggers it without typing the name. Elsewhere in this README they are abbreviated to `/qa-fix`, `/qa-gate` and so on for readability; the table above has the names you actually type.
 
-The typical arc: **plan → explore (→ fix, heal) → gate**, with manual whenever the docs need to catch up.
+The typical arc: **plan → explore (→ fix, heal) → sec → gate**, with manual whenever the docs need to catch up.
 
 ### Standalone CLI / CI (no interactive session)
 
@@ -162,6 +186,7 @@ Copy [`skills/qa-explore/qa.config.example.jsonc`](skills/qa-explore/qa.config.e
 | `plan` | `/qa-plan` risk bands (`bands.p0`/`p1`), `changed` (release diff → raises likelihood), `outFile` |
 | `gate` | `/qa-gate` rubric: `blockOn`, `requireStep0Green`, `blockOnAccessControl`, `a11yBlockOn`, audited `waive[]`, `outFile` |
 | `manual` | `/qa-manual` `audience` (end-user/installer), `outFile`, `sampleHint`, approved `toc` |
+| `security` | `/qa-sec` — **`authorized` + `scope` are required**; `intrusiveness` (`passive` default / `safe-active`), `maxLoginAttempts`, `knownAccepted` |
 
 When `tracker.type` is `none` (default), the loop stops at chat triage — no issues are filed. Set it to `gitlab`/`github` and the REPORT step files issues; `/qa-fix` then turns the ones you label into merge requests.
 
