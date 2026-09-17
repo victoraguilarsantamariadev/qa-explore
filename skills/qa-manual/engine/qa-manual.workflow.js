@@ -31,7 +31,7 @@ export const meta = {
 const cfg = args || {}
 const m = cfg.manual || {}
 const BASE = (cfg.baseUrl || 'http://localhost') + (cfg.appPath || '/')
-const SHOTS = cfg.shotsDir || '/tmp/qa-manual'
+const SHOTS = cfg.shotsDir || './qa-evidence'   // disk, never a tmpfs — see evidence.mjs `check`
 const AUD = m.audience === 'installer' ? 'installer' : 'end-user'
 const OUT = m.outFile || 'docs/manual.md'
 const VP = (cfg.viewports && cfg.viewports[0]) || { name: 'desktop', width: 1440, height: 900 }
