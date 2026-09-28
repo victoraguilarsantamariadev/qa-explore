@@ -4,7 +4,7 @@ author: qa-explore
 
 inputs:
   skill:
-    description: Which engine to run — plan | explore | report | codify | fix | heal | manual | gate.
+    description: Which engine to run — plan | explore | report | codify | fix | heal | manual | sec | gate.
     default: explore
   base-url:
     description: The deployed app URL to test (overrides baseUrl in the config).
