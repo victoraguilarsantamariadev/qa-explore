@@ -162,10 +162,11 @@ test('no engine log() string is left in Spanish', async () => {
   // Three hand-written sweeps each missed strings, because each guessed at patterns. This
   // enumerates every literal inside every log() call and rejects known Spanish words outright.
   const SPANISH = /\b(nuevas?|duplicadas?|saltadas?|fallidas?|estrategia|aprobada|soportado|archivan|desactivado|aislado|hallazgos?|bloqueantes?|veredicto|terminado|reparados?|regresi[oó]n|aserci[oó]n|unidades|cobertura|muestreo|ronda|huecos?|riesgos?|evaluadas?|pendientes?|abiertas|verificadas|dudas|sanar|un solo|no hay|issues? nuevas)\b/i
-  const engines = ['qa-explore/engine/codify.workflow.js', 'qa-explore/engine/explore-verify.workflow.js',
-    'qa-explore/engine/report-issues.workflow.js', 'qa-fix/engine/qa-fix.workflow.js',
-    'qa-gate/engine/qa-gate.workflow.js', 'qa-heal/engine/qa-heal.workflow.js',
-    'qa-plan/engine/qa-plan.workflow.js']
+  // Derive the list from the CLI's dispatch table, never by hand: a hardcoded list silently stops
+  // guarding whatever ships next, which is exactly how qa-sec reached main with 11 Spanish log lines.
+  const cli = readFileSync(resolve(HERE, '..', 'bin', 'qa-explore.mjs'), 'utf8')
+  const engines = [...new Set([...cli.matchAll(/^\s+\w+: '([^']+\.workflow\.js)',$/gm)].map((m) => m[1]))]
+  assert.ok(engines.length >= 8, 'expected every engine the CLI dispatches to, got ' + engines.length)
   const offenders = []
   for (const rel of engines) {
     const src = readFileSync(ENGINE(rel), 'utf8')

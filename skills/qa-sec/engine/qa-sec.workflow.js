@@ -38,13 +38,13 @@ const LOGIN_ATTEMPTS = Math.min(sec.maxLoginAttempts || 8, 20)   // enough to se
 
 // ---- the authorization gate: this runs against a live system, so someone must own the decision ----
 if (sec.authorized !== true) {
-  log('qa-sec: `security.authorized` no está en true — no se ejecuta nada.')
-  log('  Esta skill revisa la seguridad de una aplicación TUYA. Pon `security.authorized: true` en')
-  log('  qa.config.json junto con `security.scope` (qué sistema es y quién lo autoriza) y vuelve a lanzar.')
+  log('qa-sec: `security.authorized` is not true — nothing will run.')
+  log('  This skill reviews the security of an app YOU own. Set `security.authorized: true` in')
+  log('  qa.config.json together with `security.scope` (which system, and who authorised it), then run again.')
   return { ran: false, reason: 'not authorized: set security.authorized true + security.scope', findings: [] }
 }
 if (!ALLOWED.length) {
-  log('qa-sec: no hay baseUrl ni allowedHosts — no hay ámbito que revisar.')
+  log('qa-sec: no baseUrl and no allowedHosts — there is no scope to review.')
   return { ran: false, reason: 'no target host resolved', findings: [] }
 }
 
@@ -169,7 +169,7 @@ function preamble(role) {
 let areas = (sec.areas && sec.areas.length) ? sec.areas : (cfg.areas || [])
 if (!areas.length) {
   phase('Surface')
-  log('qa-sec: mapeando la superficie expuesta…')
+  log('qa-sec: mapping the exposed surface…')
   const recon = await agent(
     preamble() +
       '\n\n=== SURFACE MAPPING ===\nMap what this app actually EXPOSES, as a reviewer would before auditing it. ' +
@@ -183,7 +183,7 @@ if (areas.length > MAXAREAS) {
   log('⚠️ qa-sec: ' + areas.length + ' areas > cap ' + MAXAREAS + ' → dropping ' + (areas.length - MAXAREAS) + ' (raise security.maxAreas to cover them all).')
   areas = areas.slice(0, MAXAREAS)
 }
-log('qa-sec: ' + areas.length + ' área(s), intrusividad ' + INTRUSIVE + ', ' + ROLES.length + ' rol(es).')
+log('qa-sec: ' + areas.length + ' area(s), intrusiveness ' + INTRUSIVE + ', ' + ROLES.length + ' role(s).')
 
 // ---------------------------------------------------------------- Passive (always runs)
 phase('Passive')
@@ -221,8 +221,8 @@ phase('Access-control')
 const surface = areas.map((a) => '- ' + a.label + ': ' + a.mission).join('\n')
 const authzRoles = ROLES.length > 1 ? ROLES.slice(1) : [PRIMARY]
 if (ROLES.length < 2) {
-  log('⚠️ qa-sec: solo hay un rol configurado. El chequeo de autorización es MUCHO más fuerte con dos')
-  log('   (uno con menos privilegios): declara otro en `roles` para detectar escalada entre usuarios.')
+  log('⚠️ qa-sec: only one role is configured. The authorization check is MUCH stronger with two')
+  log('   (one less privileged): declare another in `roles` to catch escalation between users.')
 }
 const authz = await parallel(authzRoles.map((role) => () =>
   agent(
@@ -263,7 +263,7 @@ if (INTRUSIVE === 'safe-active') {
     ).then((r) => r ? { area: 'input/logic: ' + a.label, key: 'input-' + a.key, sec: r } : null)
   ))
 } else {
-  log('qa-sec: intrusividad "passive" → se omite la pasada de entradas y lógica de negocio (ponla en "safe-active" para incluirla).')
+  log('qa-sec: intrusiveness "passive" → skipping the input and business-logic pass (set "safe-active" to include it).')
 }
 
 // ---------------------------------------------------------------- Verify (skeptic)
@@ -295,6 +295,6 @@ for (const r of out) {
     if (f.severity === 'blocker') blockers++
   }
 }
-log('qa-sec terminado: ' + total + ' hallazgo(s) (' + proven + ' con evidencia dura, ' + blockers + ' blocker) en ' + out.length + ' pasada(s).')
-if (INTRUSIVE === 'passive') log('  (pasada pasiva: lo que no se pudo comprobar sin sondear está marcado proven:false)')
+log('qa-sec done: ' + total + ' finding(s) (' + proven + ' with hard evidence, ' + blockers + ' blocker) across ' + out.length + ' pass(es).')
+if (INTRUSIVE === 'passive') log('  (passive pass: anything that could not be checked without probing is marked proven:false)')
 return out

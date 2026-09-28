@@ -18,6 +18,9 @@ inputs:
   claude-token:
     description: CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`, uses your subscription) OR an ANTHROPIC_API_KEY. Store as a secret.
     required: true
+  evidence-path:
+    description: Where the run writes screenshots/trace/HAR/video. MUST match `shotsDir` in qa.config.json (relative to the repo root, so the upload can collect it).
+    default: qa-evidence
   node-version:
     description: Node version.
     default: "20"
@@ -68,7 +71,7 @@ runs:
         name: qa-explore-${{ inputs.skill }}
         path: |
           qa-explore-result.json
-          /tmp/qa-explore/**
+          ${{ inputs.evidence-path }}/**
         if-no-files-found: ignore
 
     # The gate is only a gate if it can fail the build. Runs after the upload so the

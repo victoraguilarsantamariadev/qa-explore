@@ -109,7 +109,7 @@ test('passive is the default and sends nothing beyond normal use', async () => {
   assert.equal(labels.filter((l) => l.startsWith('input:')).length, 0, 'no probing in passive mode')
   assert.match(calls[0].prompt, /INTRUSIVENESS = PASSIVE/)
   assert.match(calls[0].prompt, /Do NOT submit crafted input/)
-  assert.match(logs, /se omite la pasada de entradas/)
+  assert.match(logs, /skipping the input and business-logic pass/)
 })
 
 test('the passive audit covers transport, session, client exposure and dependencies', async () => {
@@ -144,7 +144,7 @@ test('access control runs per extra role and is keyed so qa-gate blocks on it', 
 test('a single role still runs the pass, but says out loud what it cannot test', async () => {
   const { labels, calls, logs } = await capture(owned())
   assert.deepEqual(labels.filter((l) => l.startsWith('authz:')), ['authz:default'])
-  assert.match(logs, /solo hay un rol configurado/)
+  assert.match(logs, /only one role is configured/)
   assert.match(calls.find((c) => c.label === 'authz:default').prompt, /only one role is configured/)
 })
 
